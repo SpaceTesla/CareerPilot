@@ -124,3 +124,6 @@ dmypy.json
 
 # FastAPI specific
 .pytest_cache/
+
+# Ruff cache
+.ruff_cache/
