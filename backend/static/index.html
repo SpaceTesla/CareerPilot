@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CareerPilot Chat - Streaming Demo</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .chat-container {
+        width: 90%;
+        max-width: 800px;
+        height: 80vh;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .chat-header {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        color: white;
+        padding: 20px;
+        text-align: center;
+        position: relative;
+      }
+      .connection-status {
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+      }
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #ffcc00;
+      }
+      .status-dot.active {
+        background: #2ed573;
+      }
+      .chat-messages {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        background: #f8f9fa;
+      }
+      .message {
+        margin-bottom: 15px;
+      }
+      .message.user {
+        text-align: right;
+      }
+      .message.ai {
+        text-align: left;
+      }
+      .message.system {
+        text-align: center;
+        font-style: italic;
+        color: #666;
+      }
+      .message-content {
+        display: inline-block;
+        max-width: 70%;
+        padding: 12px 16px;
+        border-radius: 18px;
+        word-wrap: break-word;
+      }
+      .message.user .message-content {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+      .message.ai .message-content {
+        background: white;
+        color: #333;
+        border: 1px solid #e1e8ed;
+      }
+      .message.system .message-content {
+        background: #e3f2fd;
+        color: #1976d2;
+        border-radius: 10px;
+      }
+      .message-meta {
+        font-size: 12px;
+        color: #666;
+        margin-top: 4px;
+      }
+      .typing-indicator {
+        display: none;
+        padding: 10px 16px;
+        background: white;
+        border-radius: 18px;
+        border: 1px solid #e1e8ed;
+        margin-bottom: 15px;
+      }
+      .chat-input-container {
+        padding: 20px;
+        background: white;
+        border-top: 1px solid #e1e8ed;
+      }
+      .chat-input-form {
+        display: flex;
+        gap: 10px;
+      }
+      .username-input {
+        width: 120px;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 25px;
+        outline: none;
+        font-size: 14px;
+      }
+      .message-input {
+        flex: 1;
+        padding: 12px 16px;
+        border: 1px solid #ddd;
+        border-radius: 25px;
+        outline: none;
+        font-size: 16px;
+      }
+      .message-input:focus {
+        border-color: #667eea;
+      }
+      .send-button {
+        padding: 12px 24px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      .error-message {
+        background: #ffebee;
+        color: #c62828;
+        padding: 10px;
+        border-radius: 10px;
+        margin: 10px 0;
+        border-left: 4px solid #c62828;
+      }
+      .connection-info {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="chat-container">
+      <div class="chat-header">
+        <h1>🚀 CareerPilot Chat</h1>
+        <p>Real-time AI Chat with SSE Streaming</p>
+        <div class="connection-status">
+          <div class="status-dot" id="statusDot"></div>
+          <span id="statusText">Idle</span>
+        </div>
+      </div>
+
+      <div class="chat-messages" id="chatMessages">
+        <div class="message system">
+          <div class="message-content">
+            Welcome! Type a message to start streaming.
+          </div>
+        </div>
+      </div>
+
+      <div class="typing-indicator" id="typingIndicator">AI is typing...</div>
+      <div class="connection-info" id="stats">Elapsed: 0.0s • Chars: 0</div>
+
+      <div class="chat-input-container">
+        <form class="chat-input-form" id="chatForm">
+          <input
+            type="text"
+            class="username-input"
+            id="usernameInput"
+            placeholder="Your name"
+            value="Anonymous"
+            maxlength="20"
+          />
+          <input
+            type="text"
+            class="message-input"
+            id="messageInput"
+            placeholder="Type your message here..."
+            autocomplete="off"
+          />
+          <button type="submit" class="send-button" id="sendButton">
+            Send
+          </button>
+        </form>
+        <div class="connection-info">
+          SSE: <span id="sseUrl">/chat/stream</span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      class ChatApp {
+        constructor() {
+          this.es = null;
+          this.isStreaming = false;
+          this.startTs = 0;
+          this.charCount = 0;
+          this.chatMessages = document.getElementById("chatMessages");
+          this.statusDot = document.getElementById("statusDot");
+          this.statusText = document.getElementById("statusText");
+          this.typingIndicator = document.getElementById("typingIndicator");
+          this.chatForm = document.getElementById("chatForm");
+          this.usernameInput = document.getElementById("usernameInput");
+          this.messageInput = document.getElementById("messageInput");
+          this.sseUrlEl = document.getElementById("sseUrl");
+          this.statsEl = document.getElementById("stats");
+
+          this.chatForm.addEventListener("submit", (e) => this.handleSubmit(e));
+          this.messageInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              this.handleSubmit(e);
+            }
+          });
+        }
+
+        startStream(message, username) {
+          this.isStreaming = true;
+          this.updateStatus(true);
+          this.showTyping(true);
+          this.appendUserMessage(message, username);
+          this.startTs = performance.now();
+          this.charCount = 0;
+          this.updateStats();
+
+          const params = new URLSearchParams({ message });
+          const url = `/chat/stream?${params.toString()}`;
+          this.sseUrlEl.textContent = url;
+
+          this.es = new EventSource(url);
+
+          let aiDiv = null;
+          let accumulated = "";
+
+          const ensureAIDiv = () => {
+            if (!aiDiv) {
+              aiDiv = document.createElement("div");
+              aiDiv.className = "message ai";
+              aiDiv.innerHTML = `
+                <div class="message-content"></div>
+                <div class="message-meta">AI • streaming...</div>
+              `;
+              this.chatMessages.appendChild(aiDiv);
+              this.scrollToBottom();
+            }
+            return aiDiv.querySelector(".message-content");
+          };
+
+          this.es.addEventListener("meta", (e) => {
+            // Could show model info if desired
+          });
+
+          this.es.addEventListener("token", (e) => {
+            accumulated += e.data;
+            this.charCount += e.data.length;
+            const contentEl = ensureAIDiv();
+            contentEl.textContent = accumulated;
+            this.scrollToBottom();
+            this.updateStats();
+          });
+
+          this.es.addEventListener("end", () => {
+            this.finishStream();
+          });
+          this.es.onerror = () => {
+            this.showError("Streaming error");
+            this.finishStream();
+          };
+        }
+
+        finishStream() {
+          this.showTyping(false);
+          this.updateStatus(false);
+          if (this.es) {
+            this.es.close();
+            this.es = null;
+          }
+          this.isStreaming = false;
+          this.updateStats(true);
+        }
+
+        handleSubmit(e) {
+          e.preventDefault();
+          const message = this.messageInput.value.trim();
+          const username = this.usernameInput.value.trim() || "Anonymous";
+          if (!message || this.isStreaming) return;
+          this.messageInput.value = "";
+          this.startStream(message, username);
+        }
+
+        appendUserMessage(message, username) {
+          const messageDiv = document.createElement("div");
+          messageDiv.className = "message user";
+          messageDiv.innerHTML = `
+            <div class="message-content">${this.escapeHtml(message)}</div>
+            <div class="message-meta">${this.escapeHtml(
+              username
+            )} • just now</div>
+          `;
+          this.chatMessages.appendChild(messageDiv);
+          this.scrollToBottom();
+        }
+
+        showError(error) {
+          const errorDiv = document.createElement("div");
+          errorDiv.className = "error-message";
+          errorDiv.textContent = error;
+          this.chatMessages.appendChild(errorDiv);
+          this.scrollToBottom();
+        }
+
+        updateStatus(active) {
+          if (active) {
+            this.statusDot.classList.add("active");
+            this.statusText.textContent = "Streaming";
+          } else {
+            this.statusDot.classList.remove("active");
+            this.statusText.textContent = "Idle";
+          }
+        }
+
+        showTyping(show) {
+          this.typingIndicator.style.display = show ? "block" : "none";
+        }
+        scrollToBottom() {
+          this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        }
+        escapeHtml(text) {
+          const div = document.createElement("div");
+          div.textContent = text;
+          return div.innerHTML;
+        }
+
+        updateStats(final = false) {
+          const elapsedMs = performance.now() - this.startTs || 0;
+          const elapsed = (elapsedMs / 1000).toFixed(1);
+          const label = final ? "Done" : `${this.statusText.textContent}`;
+          this.statsEl.textContent = `Elapsed: ${elapsed}s • Chars: ${this.charCount}`;
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        new ChatApp();
+      });
+    </script>
+  </body>
+</html>
