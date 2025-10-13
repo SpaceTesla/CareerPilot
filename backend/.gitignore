@@ -127,3 +127,9 @@ dmypy.json
 
 # Ruff cache
 .ruff_cache/
+
+# Uploads
+uploads/
+
+# Processed files
+processed/
