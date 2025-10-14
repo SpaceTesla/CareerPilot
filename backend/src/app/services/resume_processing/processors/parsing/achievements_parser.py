@@ -4,7 +4,7 @@ import re
 
 from app.schemas.resume import AchievementItem
 
-from .bullets import BulletParser
+from .bullet_parser import BulletParser
 
 
 class AchievementsParser:

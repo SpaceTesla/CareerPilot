@@ -7,9 +7,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .processing.resume_processor import ResumeProcessor
-from .retrieval.resume_retriever import ResumeRetriever
-from .vectorstore.resume_vectorstore import ResumeVectorStore
+from ..resume_processing.processors.processor import ResumeProcessor
+from .retrieval.retriever import ResumeRetriever
+from .storage.vectorstore import ResumeVectorStore
 
 
 class RAGService:

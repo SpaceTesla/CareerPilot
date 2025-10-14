@@ -11,7 +11,7 @@ from typing import Any
 
 import pymupdf4llm
 
-from .resume_extractor import GeminiEnricher, ResumeExtractor
+from .extractor import GeminiEnricher, ResumeExtractor
 
 
 class ResumeProcessor:

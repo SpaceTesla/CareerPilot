@@ -3,9 +3,9 @@ Test script for the new RAG architecture.
 Shows how to use the different service layers.
 """
 
-from app.services.rag.processing.resume_processor import ResumeProcessor
 from app.services.rag.rag_service import RAGService
-from app.services.rag.resume_service import ResumeService
+from app.services.resume_processing.processors.processor import ResumeProcessor
+from app.services.resume_processing.resume_service import ResumeService
 
 
 def main():

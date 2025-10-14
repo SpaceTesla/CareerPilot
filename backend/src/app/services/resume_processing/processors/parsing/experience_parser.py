@@ -4,7 +4,7 @@ import re
 
 from app.schemas.resume import ExperienceItem
 
-from .bullets import BulletParser
+from .bullet_parser import BulletParser
 
 
 class ExperienceParser:

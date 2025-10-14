@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from ...services.rag.resume_service import ResumeService
+from ...services.resume_processing.resume_service import ResumeService
 
 router = APIRouter(prefix="/resume", tags=["resume"])
 
