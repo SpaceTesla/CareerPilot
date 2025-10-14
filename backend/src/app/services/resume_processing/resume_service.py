@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .processing.resume_processor import ResumeProcessor
+from .processors.processor import ResumeProcessor
 
 
 class ResumeService:

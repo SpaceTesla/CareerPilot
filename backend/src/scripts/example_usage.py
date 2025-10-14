@@ -3,7 +3,7 @@ Example usage of ResumeService for API integration.
 This shows how to use the service programmatically without argparse.
 """
 
-from app.services.rag.resume_service import ResumeService
+from app.services.resume_processing.resume_service import ResumeService
 
 
 def main():

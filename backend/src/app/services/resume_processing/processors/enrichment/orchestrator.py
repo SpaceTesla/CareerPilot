@@ -5,7 +5,7 @@ from typing import Any
 
 from .llm_client import LLMClient, LLMConfig
 from .prompt_builder import PromptBuilder
-from .result_validator import ResultValidator
+from .validator import ResultValidator
 
 
 @dataclass

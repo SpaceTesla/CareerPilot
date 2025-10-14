@@ -4,17 +4,17 @@ import json as _json
 from pathlib import Path
 
 from ....schemas.resume import Resume
-from .detection.contacts import ContactDetector
+from .detection.contact_detector import ContactDetector
 from .detection.name_detector import NameDetector
-from .enrichment.enrichment_orchestrator import EnrichmentConfig, EnrichmentOrchestrator
+from .enrichment.orchestrator import EnrichmentConfig, EnrichmentOrchestrator
 from .parsing.achievements_parser import AchievementsParser
-from .parsing.bullets import BulletParser
+from .parsing.bullet_parser import BulletParser
 from .parsing.education_parser import EducationParser
 from .parsing.experience_parser import ExperienceParser
 from .parsing.projects_parser import ProjectsParser
 from .parsing.skills_parser import SkillsParser
-from .text.cleaner import TextCleaner
 from .text.section_splitter import SectionSplitter
+from .text.text_cleaner import TextCleaner
 
 # Limits for model input to avoid excessive token usage
 SOURCE_SNIPPET_LIMIT = 16000
