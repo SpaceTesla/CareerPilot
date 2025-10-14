@@ -3,9 +3,9 @@ Test script for the new RAG architecture.
 Shows how to use the different service layers.
 """
 
-from app.services.rag.rag_service import RAGService
-from app.services.resume_processing.processors.processor import ResumeProcessor
-from app.services.resume_processing.resume_service import ResumeService
+from ...app.infrastructure.rag.orchestrator import RAGService
+from ...app.services.resume_processing.processors.processor import ResumeProcessor
+from ...app.services.resume_processing.resume_service import ResumeService
 
 
 def main():
@@ -17,7 +17,7 @@ def main():
     print("1. Testing ResumeProcessor (processing layer):")
     processor = ResumeProcessor()
     data = processor.process(
-        file_path="uploads/pdfs/resume-shivansh-ai.pdf",
+        file_path="data/uploads/pdfs/resume-shivansh-ai.pdf",
         enrich=True,
         save_markdown=True,
     )
@@ -27,7 +27,7 @@ def main():
     print("\n2. Testing ResumeService (orchestration layer):")
     service = ResumeService()
     data = service.process_resume(
-        file_path="uploads/pdfs/resume-shivansh-ai.pdf",
+        file_path="data/uploads/pdfs/resume-shivansh-ai.pdf",
         enrich=True,
         save_output=True,
         save_markdown=True,
@@ -38,7 +38,7 @@ def main():
     print("\n3. Testing RAGService (full RAG layer):")
     rag_service = RAGService()
     resume_id = rag_service.process_and_store_resume(
-        file_path="uploads/pdfs/resume-shivansh-ai.pdf",
+        file_path="data/uploads/pdfs/resume-shivansh-ai.pdf",
         enrich=True,
         save_markdown=True,
     )
