@@ -3,7 +3,7 @@ Test script for PDF resume processing.
 Shows the complete PDF -> JSON workflow.
 """
 
-from app.services.resume_processing.resume_service import ResumeService
+from ...app.services.resume_processing.resume_service import ResumeService
 
 
 def main():
