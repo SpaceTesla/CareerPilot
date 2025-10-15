@@ -5,12 +5,14 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from app.api.v1.chat import router as chat_router
 from app.api.v1.index import router as index_router
 from app.api.v1.resume import router as resume_router
 from app.core.config import settings
 from app.core.logging import get_logger, setup_logging
+from app.infrastructure.database.connection import engine
 
 # Configure logging
 setup_logging(level="INFO", include_file_handler=True, log_file="logs/app.log")
@@ -22,6 +24,14 @@ async def lifespan(app: FastAPI):
     logger = get_logger(__name__)
     logger.info(f"Starting {app.title} v{settings.app_version}")
     logger.info(f"Using model: {settings.model_name}")
+    # DB health check
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info("Database connection OK")
+    except Exception as e:
+        logger.error(f"Database connection failed: {e}")
+        raise
     yield
 
     # At shutdown

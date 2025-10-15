@@ -1,0 +1,4 @@
+include:
+  - path: ./backend/compose.yaml
+# Future:
+#  - path: ./frontend/compose.yaml
