@@ -30,6 +30,15 @@ class Settings(BaseSettings):
     )
     timeout: int = Field(default=30, ge=1, description="Request timeout in seconds")
 
+    # Database configuration
+    database_url: str = Field(
+        default="postgresql+psycopg2://postgres:postgres@localhost:5432/careerpilot",
+        description="SQLAlchemy Database URL",
+    )
+    pgvector_enabled: bool = Field(
+        default=True, description="Enable pgvector extension for embeddings"
+    )
+
     @field_validator("google_api_key")
     @classmethod
     def validate_google_api_key(cls, v: str) -> str:

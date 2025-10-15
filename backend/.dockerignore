@@ -1,0 +1,39 @@
+# VCS
+.git
+
+# Python caches
+__pycache__
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Env/venv
+.env
+.env.local
+.venv
+
+# IDE
+.idea
+.vscode
+
+# Caches
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Builds
+build
+.dist
+
+# OS
+**/.DS_Store
+
+# Logs and data
+*.log
+logs
+processed
+.data
+
+# Node
+node_modules
