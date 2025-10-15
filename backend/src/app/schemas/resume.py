@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field, HttpUrl
 
-SchemaVersion = Literal["1.0.0"]
+SchemaVersion = Literal["1.0.0", "1.0.1"]
 
 
 class Socials(BaseModel):
@@ -45,8 +45,15 @@ class AchievementItem(BaseModel):
     description: str | None = None
 
 
+class CoCurricularItem(BaseModel):
+    title: str
+    organization: str | None = None
+    period: str | None = None
+    description: str | None = None
+
+
 class Resume(BaseModel):
-    schemaVersion: SchemaVersion = "1.0.0"
+    schemaVersion: SchemaVersion = "1.0.1"
     source_file: str | None = None
 
     name: str | None = None
@@ -62,4 +69,5 @@ class Resume(BaseModel):
     skills: Skills | None = Field(default_factory=Skills)
     certifications: list[str] | None = Field(default_factory=list)
     achievements: list[AchievementItem] | None = Field(default_factory=list)
+    coCurricular: list[CoCurricularItem] | None = Field(default_factory=list)
     summary: str | None = None

@@ -9,6 +9,7 @@ from .detection.name_detector import NameDetector
 from .enrichment.orchestrator import EnrichmentConfig, EnrichmentOrchestrator
 from .parsing.achievements_parser import AchievementsParser
 from .parsing.bullet_parser import BulletParser
+from .parsing.cocurricular_parser import CoCurricularParser
 from .parsing.education_parser import EducationParser
 from .parsing.experience_parser import ExperienceParser
 from .parsing.projects_parser import ProjectsParser
@@ -45,6 +46,7 @@ class ResumeExtractor:
         projects_parser: ProjectsParser | None = None,
         skills_parser: SkillsParser | None = None,
         achievements_parser: AchievementsParser | None = None,
+        cocurricular_parser: CoCurricularParser | None = None,
     ) -> None:
         self.text_cleaner = text_cleaner or TextCleaner()
         self.section_splitter = section_splitter or SectionSplitter()
@@ -55,6 +57,7 @@ class ResumeExtractor:
         self.projects_parser = projects_parser or ProjectsParser()
         self.skills_parser = skills_parser or SkillsParser()
         self.achievements_parser = achievements_parser or AchievementsParser()
+        self.cocurricular_parser = cocurricular_parser or CoCurricularParser()
 
     def from_markdown(
         self, md_path: str | Path, source_file: str | None = None
@@ -75,6 +78,7 @@ class ResumeExtractor:
             sections.get("skills", "") or sections.get("technical skills", "")
         )
         achievements = self.achievements_parser.parse(sections.get("achievements", ""))
+        cocurricular = self.cocurricular_parser.parse(sections.get("cocurricular", ""))
         certifications = (
             BulletParser.to_list(sections.get("certifications", ""))
             if sections.get("certifications")
@@ -94,6 +98,7 @@ class ResumeExtractor:
             skills=skills.model_dump() if skills else None,
             certifications=certifications,
             achievements=[item.model_dump() for item in achievements],
+            coCurricular=[item.model_dump() for item in cocurricular],
             summary=summary.strip() if summary else None,
         )
 

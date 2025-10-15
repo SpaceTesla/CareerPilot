@@ -20,6 +20,14 @@ class SectionSplitter:
         "skills",
         "achievements",
         "certifications",
+        "co-curricular",
+        "co-curricular activities",
+        "extra-curricular",
+        "extra-curricular activities",
+        "cocurricular",
+        "extracurricular",
+        "activities",
+        "involvement",
         "summary",
         "profile",
     }
@@ -41,7 +49,21 @@ class SectionSplitter:
             raw = re.sub(r"[*_#:`]+", "", line).strip()
             low = raw.lower()
             if low in self.section_titles:
-                return "skills" if low == "technical skills" else low
+                if low == "technical skills":
+                    return "skills"
+                elif low in {
+                    "co-curricular",
+                    "co-curricular activities",
+                    "extra-curricular",
+                    "extra-curricular activities",
+                    "cocurricular",
+                    "extracurricular",
+                    "activities",
+                    "involvement",
+                }:
+                    return "cocurricular"
+                else:
+                    return low
             if len(raw) <= 60 and (raw.istitle() or (raw.isupper() and len(raw) >= 3)):
                 if low in {
                     "education",
@@ -50,6 +72,10 @@ class SectionSplitter:
                     "skills",
                     "achievements",
                     "certifications",
+                    "cocurricular",
+                    "extracurricular",
+                    "activities",
+                    "involvement",
                     "summary",
                     "profile",
                 }:

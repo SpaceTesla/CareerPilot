@@ -48,6 +48,7 @@ class ResultValidator:
             "projects",
             "skills",
             "achievements",
+            "coCurricular",
         ]
         missing_fields = [
             field for field in required_fields if field not in enriched_data
