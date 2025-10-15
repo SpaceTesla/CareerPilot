@@ -1,5 +1,6 @@
 import logging
 import sys
+from pathlib import Path
 
 
 def setup_logging(
@@ -30,6 +31,10 @@ def setup_logging(
 
     # Add file handler if requested
     if include_file_handler:
+        # Create log directory if it doesn't exist
+        log_path = Path(log_file)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(getattr(logging, level.upper()))
         file_handler.setFormatter(logging.Formatter(format_string))
