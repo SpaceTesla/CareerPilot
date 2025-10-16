@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
+from app.api.v1.agent import router as agent_router
 from app.api.v1.chat import router as chat_router
 from app.api.v1.index import router as index_router
 from app.api.v1.resume import router as resume_router
@@ -50,6 +51,7 @@ app.add_middleware(
 
 app.include_router(index_router)
 app.include_router(chat_router)
+app.include_router(agent_router)
 app.include_router(resume_router)
 
 # Create static directory if it doesn't exist
