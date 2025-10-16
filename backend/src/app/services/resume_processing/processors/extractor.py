@@ -6,7 +6,7 @@ from pathlib import Path
 from ....schemas.resume import Resume
 from .detection.contact_detector import ContactDetector
 from .detection.name_detector import NameDetector
-from .enrichment.orchestrator import EnrichmentConfig, EnrichmentOrchestrator
+from .enrichment.orchestrator import EnrichmentOrchestrator
 from .parsing.achievements_parser import AchievementsParser
 from .parsing.bullet_parser import BulletParser
 from .parsing.cocurricular_parser import CoCurricularParser
@@ -109,9 +109,8 @@ class ResumeExtractor:
 class GeminiEnricher:
     """Enriches a Resume JSON using the agent-based architecture."""
 
-    def __init__(self, config: EnrichmentConfig | None = None) -> None:
-        self.config = config or EnrichmentConfig()
-        self.orchestrator = EnrichmentOrchestrator(self.config)
+    def __init__(self, preserve_metadata: bool = True) -> None:
+        self.orchestrator = EnrichmentOrchestrator(preserve_metadata=preserve_metadata)
 
     def enrich(self, cleaned_text: str, resume_json: dict) -> dict:
         """Enrich resume data using the complete agent workflow."""
@@ -121,7 +120,6 @@ class GeminiEnricher:
 
 
 __all__ = [
-    "EnrichmentConfig",
     "ResumeExtractor",
     "GeminiEnricher",
     "resume_to_json",
