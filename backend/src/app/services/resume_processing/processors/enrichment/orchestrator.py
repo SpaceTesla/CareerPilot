@@ -1,38 +1,20 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
-from .llm_client import LLMClient, LLMConfig
+from .llm_client import LLMClient
 from .prompt_builder import PromptBuilder
 from .validator import ResultValidator
-
-
-@dataclass
-class EnrichmentConfig:
-    model: str = "gemini-2.5-flash"
-    temperature: float = 0.0
-    api_key_env: str = "GOOGLE_API_KEY"
-    preserve_metadata: bool = True
 
 
 class EnrichmentOrchestrator:
     """Orchestrates the complete enrichment workflow using separate agents."""
 
-    def __init__(self, config: EnrichmentConfig | None = None) -> None:
-        self.config = config or EnrichmentConfig()
-
+    def __init__(self, preserve_metadata: bool = True) -> None:
         # Initialize agents
-        llm_config = LLMConfig(
-            model=self.config.model,
-            temperature=self.config.temperature,
-            api_key_env=self.config.api_key_env,
-        )
-        self.llm_client = LLMClient(llm_config)
+        self.llm_client = LLMClient()
         self.prompt_builder = PromptBuilder()
-        self.result_validator = ResultValidator(
-            preserve_metadata=self.config.preserve_metadata
-        )
+        self.result_validator = ResultValidator(preserve_metadata=preserve_metadata)
 
     def enrich(
         self,
@@ -81,9 +63,13 @@ class EnrichmentOrchestrator:
 
         if not validation_result.is_valid:
             print(
-                f"[EnrichmentOrchestrator] Validation errors: {validation_result.errors}"
+                f"[EnrichmentOrchestrator] \
+                    Validation errors: {validation_result.errors}"
             )
             return resume_json
 
-        print(f"[EnrichmentOrchestrator] Enrichment applied using {self.config.model}")
+        print(
+            f"[EnrichmentOrchestrator] \
+                Enrichment applied using {self.llm_client.model_name}"
+        )
         return validation_result.data
