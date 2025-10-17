@@ -33,7 +33,8 @@ Available tools:
 - get_achievements: Get user's achievements and awards
 - get_co_curricular: Get user's co-curricular activities
 - analyze_resume_strengths: Analyze resume strengths
-- suggest_improvements: Suggest resume improvements"""
+- suggest_improvements: Suggest resume improvements
+- recommend_courses: Recommend online courses based on user's profile and skills"""
 
     CONTACT_QUERY_PROMPT = """The user is asking about contact information. Use the get_contact_info tool to fetch their current contact details and provide a helpful response."""
 
@@ -50,6 +51,8 @@ Available tools:
     CO_CURRICULAR_QUERY_PROMPT = """The user is asking about their co-curricular activities or extracurricular involvement. Use the get_co_curricular tool to fetch their activities data."""
 
     ANALYSIS_QUERY_PROMPT = """The user is asking for resume analysis or insights. Use the appropriate analysis tools to provide comprehensive feedback about their resume."""
+
+    COURSES_QUERY_PROMPT = """The user is asking for course recommendations or learning suggestions. Use the recommend_courses tool to search for relevant online courses based on their profile and skills."""
 
     GENERAL_QUERY_PROMPT = """The user has a general question about their resume. Analyze their question and use the most appropriate tools to provide a helpful response. If the question is unclear, ask for clarification."""
 
@@ -76,5 +79,6 @@ Available tools:
             "get_co_curricular": cls.CO_CURRICULAR_QUERY_PROMPT,
             "analyze_resume_strengths": cls.ANALYSIS_QUERY_PROMPT,
             "suggest_improvements": cls.ANALYSIS_QUERY_PROMPT,
+            "recommend_courses": cls.COURSES_QUERY_PROMPT,
         }
         return tool_prompts.get(tool_name, cls.GENERAL_QUERY_PROMPT)

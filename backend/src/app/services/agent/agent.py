@@ -14,6 +14,10 @@ from app.services.agent.tools.analysis_tools import (
     get_resume_metrics_tool,
     suggest_improvements_tool,
 )
+from app.services.agent.tools.course_recommendation_tools import (
+    recommend_courses_tool,
+    recommend_courses_with_context_tool,
+)
 from app.services.agent.tools.resume_tools import (
     get_achievements_tool,
     get_co_curricular_tool,
@@ -52,6 +56,9 @@ class AgentService:
             "analyze_resume_strengths": analyze_resume_strengths_tool,
             "suggest_improvements": suggest_improvements_tool,
             "get_resume_metrics": get_resume_metrics_tool,
+            # Course recommendation tools
+            "recommend_courses": recommend_courses_tool,
+            "recommend_courses_with_context": recommend_courses_with_context_tool,
         }
 
         # Intent patterns for better routing
@@ -88,6 +95,12 @@ class AgentService:
                 r"\b(analyze|analysis|strengths?|weaknesses?|improve|feedback)\b",
                 r"\b(how good|rate|score|evaluate|review)\b",
                 r"\b(suggestions?|recommendations?|tips?|advice)\b",
+            ],
+            "courses": [
+                r"\b(courses?|learn|study|training|education|tutorial|bootcamp)\b",
+                r"\b(what should I learn|recommend courses|suggest courses)\b",
+                r"\b(skills to improve|upskill|reskill|professional development)\b",
+                r"\b(certification|certificate|course recommendations)\b",
             ],
             "summary": [
                 r"\b(summary|about|overview|introduction|profile)\b",
@@ -126,6 +139,7 @@ class AgentService:
             "co_curricular": "get_co_curricular",
             "summary": "get_summary",
             "analysis": "analyze_resume_strengths",
+            "courses": "recommend_courses",
         }
 
         # Execute tools for detected intents
@@ -137,8 +151,12 @@ class AgentService:
                         tool_result = await self.tools[tool_name](user_id=user_id)
                         results[tool_name] = tool_result
                         actions_taken.append(tool_name)
+                        print(
+                            f"DEBUG: Tool {tool_name} executed successfully, result keys: {tool_result.keys() if isinstance(tool_result, dict) else 'Not a dict'}"
+                        )
                     except Exception as e:
                         results[f"{tool_name}_error"] = str(e)
+                        print(f"DEBUG: Tool {tool_name} failed with error: {e}")
 
         # If analysis intent detected, also get suggestions
         if "analysis" in intents and "suggest_improvements" in self.tools:
@@ -148,6 +166,32 @@ class AgentService:
                 actions_taken.append("suggest_improvements")
             except Exception as e:
                 results["suggestions_error"] = str(e)
+
+        # If courses intent detected, use context-aware approach
+        if "courses" in intents and "recommend_courses_with_context" in self.tools:
+            try:
+                # Get skills and experience data for context
+                skills_data = results.get("get_skills", {})
+                experience_data = results.get("get_experience", [])
+
+                # Use context-aware course recommendation
+                courses = await self.tools["recommend_courses_with_context"](
+                    skills_data=(skills_data if "error" not in skills_data else None),
+                    experience_data=(
+                        experience_data if "error" not in experience_data else None
+                    ),
+                    user_id=user_id,
+                )
+                results["recommend_courses"] = courses
+                actions_taken.append("recommend_courses_with_context")
+            except Exception:
+                # Fallback to basic course recommendation
+                try:
+                    courses = await self.tools["recommend_courses"](user_id=user_id)
+                    results["recommend_courses"] = courses
+                    actions_taken.append("recommend_courses")
+                except Exception as fallback_error:
+                    results["recommend_courses_error"] = str(fallback_error)
 
         return {"results": results, "actions_taken": actions_taken}
 
@@ -265,6 +309,58 @@ class AgentService:
                         response_parts.append(f"• {improvement['suggestion']}")
                     response_parts.append("")
 
+        # Handle course recommendations
+        if "recommend_courses" in tool_results:
+            courses_data = tool_results["recommend_courses"]
+            print(
+                f"DEBUG: Course data keys: "
+                f"{courses_data.keys() if isinstance(courses_data, dict) else 'Not a dict'}"
+            )
+            print(
+                f"DEBUG: Recommendations count: "
+                f"{len(courses_data.get('recommendations', []))}"
+            )
+
+            if "error" not in courses_data:
+                response_parts.append("**Course Recommendations:**\n")
+
+                # Show user profile analysis
+                if "user_profile" in courses_data:
+                    profile = courses_data["user_profile"]
+                    role = profile["primary_role"]
+                    skills_count = profile["total_skills"]
+                    response_parts.append(
+                        f"Based on your profile as a **{role}** developer "
+                        f"with {skills_count} skills:"
+                    )
+                    key_skills = ", ".join(profile["key_skills"])
+                    response_parts.append(f"Key skills: {key_skills}")
+                    response_parts.append("")
+
+                # Show course recommendations
+                if "recommendations" in courses_data:
+                    recommendations = courses_data["recommendations"]
+                    response_parts.append("**Recommended Courses:**\n")
+                    for i, course in enumerate(recommendations[:5], 1):  # Top 5
+                        response_parts.append(f"{i}. **{course['title']}**")
+                        response_parts.append(f"   Platform: {course['platform']}")
+                        response_parts.append(
+                            f"   Description: {course['description']}"
+                        )
+                        response_parts.append("")
+
+                # Show search queries used
+                if "search_queries_used" in courses_data:
+                    queries = courses_data["search_queries_used"]
+                    response_parts.append("**Search Strategy:**")
+                    response_parts.append(
+                        "I analyzed your resume and searched for courses using "
+                        "these criteria:"
+                    )
+                    for query in queries:
+                        response_parts.append(f"• {query}")
+                    response_parts.append("")
+
         if response_parts:
             return "\n".join(response_parts)
         return (
@@ -305,9 +401,12 @@ class AgentService:
                 }
 
         except Exception as e:
+            import traceback
+
             return {
                 "message": f"I encountered an error while processing your request: {str(e)}",
                 "data": None,
                 "actions_taken": [],
                 "confidence": 0.0,
+                "error_details": traceback.format_exc(),
             }

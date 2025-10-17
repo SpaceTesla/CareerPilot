@@ -23,3 +23,4 @@ class AgentChatResponse(BaseModel):
     model: str | None = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     success: bool = True
+    error_details: str | None = None
