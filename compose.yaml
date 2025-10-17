@@ -1,4 +1,3 @@
 include:
   - path: ./backend/compose.yaml
-# Future:
-#  - path: ./frontend/compose.yaml
+  - path: ./frontend/compose.yaml

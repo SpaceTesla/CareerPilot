@@ -1,0 +1,19 @@
+name: careerpilot-frontend
+
+services:
+  frontend:
+    build:
+      context: .
+    image: careerpilot-frontend:latest
+    container_name: careerpilot-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
