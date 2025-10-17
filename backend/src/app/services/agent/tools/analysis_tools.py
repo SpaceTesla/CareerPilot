@@ -147,7 +147,10 @@ async def suggest_improvements_tool(user_id: str | None) -> dict[str, Any]:
             suggestions["priority_improvements"].append(
                 {
                     "section": "Professional Summary",
-                    "suggestion": "Add a compelling 2-3 line professional summary highlighting your key strengths and career objectives",
+                    "suggestion": (
+                        "Add a compelling 2-3 line professional summary "
+                        "highlighting your key strengths and career objectives"
+                    ),
                     "impact": "High - First thing recruiters see",
                 }
             )
@@ -167,7 +170,9 @@ async def suggest_improvements_tool(user_id: str | None) -> dict[str, Any]:
             suggestions["optional_enhancements"].append(
                 {
                     "section": "Technical Skills",
-                    "suggestion": "Add more programming languages you're familiar with",
+                    "suggestion": (
+                        "Add more programming languages you're familiar with"
+                    ),
                     "impact": "Medium - Shows technical breadth",
                 }
             )
@@ -176,10 +181,11 @@ async def suggest_improvements_tool(user_id: str | None) -> dict[str, Any]:
         experience = raw_data.get("experience", [])
         for i, exp in enumerate(experience):
             if not exp.get("details") or len(exp.get("details", [])) < 2:
+                role = exp.get("role", "this position")
                 suggestions["content_suggestions"].append(
                     {
                         "section": f"Experience #{i + 1}",
-                        "suggestion": f"Add more detailed bullet points for {exp.get('role', 'this position')}",
+                        "suggestion": f"Add more detailed bullet points for {role}",
                         "impact": "Medium - Quantifies your impact",
                     }
                 )
@@ -232,7 +238,7 @@ async def get_resume_metrics_tool(user_id: str | None) -> dict[str, Any]:
             section_words = 0
             for item in items:
                 if isinstance(item, dict):
-                    for key, value in item.items():
+                    for value in item.values():
                         if isinstance(value, (str, list)):
                             if isinstance(value, list):
                                 section_words += sum(len(str(v).split()) for v in value)
@@ -264,7 +270,7 @@ async def get_resume_metrics_tool(user_id: str | None) -> dict[str, Any]:
         )
         metrics["diversity_metrics"]["total_skills"] = total_skills
         metrics["diversity_metrics"]["skill_categories"] = len(
-            [cat for cat in skills.keys() if skills[cat]]
+            [cat for cat in skills if skills[cat]]
         )
 
         return metrics
