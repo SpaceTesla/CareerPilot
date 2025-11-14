@@ -49,12 +49,19 @@ export default function Home() {
       const data = await response.json();
       console.log("Resume processed:", data);
 
-      // Persist user_id for chat requests (try several common keys)
+      // Persist identifiers for future chat sessions
       try {
         const userId =
           (data && (data.user_id ?? data.userId ?? data.id)) ?? null;
         if (userId) {
           localStorage.setItem("cp_user_id", String(userId));
+        }
+
+        const sessionId =
+          (data && (data.session_id ?? data.sessionId ?? data.conversation_id)) ??
+          null;
+        if (sessionId) {
+          localStorage.setItem("cp_session_id", String(sessionId));
         }
       } catch (_) {
         // no-op if storage fails

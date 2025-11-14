@@ -7,6 +7,10 @@ from typing import Any
 from tavily import TavilyClient
 
 from app.core.config import settings
+from app.infrastructure.database.connection import get_session
+from app.infrastructure.database.repositories.resume_repository import (
+    ResumeRepository,
+)
 
 
 class CourseRecommendationService:
@@ -14,6 +18,33 @@ class CourseRecommendationService:
 
     def __init__(self) -> None:
         self.search_tool = TavilyClient(api_key=settings.tavily_api_key)
+
+    def _load_user_context(
+        self, user_id: str | None
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Load skills and experience data directly from the database."""
+        if not user_id:
+            return {}, []
+
+        with get_session() as session:
+            repo = ResumeRepository(session)
+            profiles = repo.get_by_user(user_id)
+            if not profiles:
+                return {}, []
+
+            profile = sorted(profiles, key=lambda p: p.updated_at, reverse=True)[0]
+            raw_data = getattr(profile, "raw_data", {}) or {}
+            skills = raw_data.get("skills", {}) or {}
+            experience = raw_data.get("experience", []) or []
+
+            skills_payload = {
+                "languages": skills.get("languages", []),
+                "frameworks": skills.get("frameworks", []),
+                "tools": skills.get("tools", []),
+            }
+            experience_payload = [exp for exp in experience if isinstance(exp, dict)]
+
+            return skills_payload, experience_payload
 
     def _extract_skills_from_context(self, skills_data: dict[str, Any]) -> list[str]:
         """Extract skills from agent's skills tool result."""
@@ -437,11 +468,18 @@ class CourseRecommendationService:
         self,
         skills_data: dict[str, Any] | None = None,
         experience_data: list[dict[str, Any]] | None = None,
-        _user_id: str | None = None,
+        user_id: str | None = None,
     ) -> dict[str, Any]:
         """Search for course recommendations using Tavily and agent context data."""
         try:
-            # Use provided context or default to general search queries
+            # Use provided context or fetch from the database when available
+            if user_id and (not skills_data or not experience_data):
+                db_skills, db_experience = self._load_user_context(user_id)
+                if not skills_data:
+                    skills_data = db_skills
+                if not experience_data:
+                    experience_data = db_experience
+
             if skills_data and experience_data:
                 # Extract skills and determine role from agent context
                 skills = self._extract_skills_from_context(skills_data)
@@ -527,9 +565,9 @@ async def recommend_courses_tool(user_id: str | None) -> dict[str, Any]:
 
 
 async def recommend_courses_with_context_tool(
+    user_id: str | None = None,
     skills_data: dict[str, Any] | None = None,
     experience_data: list[dict[str, Any]] | None = None,
-    user_id: str | None = None,
 ) -> dict[str, Any]:
     """Tool to recommend courses using agent context data.
 

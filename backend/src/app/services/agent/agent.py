@@ -1,14 +1,21 @@
 from __future__ import annotations
 
-import re
-from collections.abc import Callable
-from typing import Any
+import json
+from typing import Any, Dict, List
 
+from langchain_core.messages import (
+    AIMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.core.config import settings
 from app.services.agent.llm.prompt_templates import AgentPrompts
+from app.services.agent.memory import ConversationMemory
 from app.services.agent.tools.analysis_tools import (
     analyze_resume_strengths_tool,
     get_resume_metrics_tool,
@@ -30,435 +37,217 @@ from app.services.agent.tools.resume_tools import (
 )
 
 
+@tool("get_contact_info", return_direct=False)
+async def agent_get_contact_info(user_id: str) -> dict[str, Any]:
+    """Retrieve the latest contact information (name, email, phone, location) for the user."""
+    return await get_contact_info_tool(user_id=user_id)
+
+
+@tool("get_skills", return_direct=False)
+async def agent_get_skills(user_id: str) -> dict[str, Any]:
+    """Fetch the structured skills breakdown (languages, frameworks, tools) for the user."""
+    return await get_skills_tool(user_id=user_id)
+
+
+@tool("get_experience", return_direct=False)
+async def agent_get_experience(user_id: str) -> List[dict[str, Any]]:
+    """Return the work experience entries for the user with roles, companies, and bullet points."""
+    return await get_experience_tool(user_id=user_id)
+
+
+@tool("get_education", return_direct=False)
+async def agent_get_education(user_id: str) -> List[dict[str, Any]]:
+    """Return the education history (degrees, schools, GPA) for the user."""
+    return await get_education_tool(user_id=user_id)
+
+
+@tool("get_projects", return_direct=False)
+async def agent_get_projects(user_id: str) -> List[dict[str, Any]]:
+    """Return notable project entries including tech stack and impact statements."""
+    return await get_projects_tool(user_id=user_id)
+
+
+@tool("get_achievements", return_direct=False)
+async def agent_get_achievements(user_id: str) -> List[dict[str, Any]]:
+    """Fetch awards or achievements listed in the resume."""
+    return await get_achievements_tool(user_id=user_id)
+
+
+@tool("get_co_curricular", return_direct=False)
+async def agent_get_co_curricular(user_id: str) -> List[dict[str, Any]]:
+    """Fetch co-curricular or extracurricular activities for the user."""
+    return await get_co_curricular_tool(user_id=user_id)
+
+
+@tool("get_summary", return_direct=False)
+async def agent_get_summary(user_id: str) -> dict[str, Any]:
+    """Get the professional summary and headline information."""
+    return await get_summary_tool(user_id=user_id)
+
+
+@tool("analyze_resume_strengths", return_direct=False)
+async def agent_analyze_resume_strengths(user_id: str) -> dict[str, Any]:
+    """Provide a quantitative assessment of the resume's strengths and gaps."""
+    return await analyze_resume_strengths_tool(user_id=user_id)
+
+
+@tool("suggest_improvements", return_direct=False)
+async def agent_suggest_improvements(user_id: str) -> dict[str, Any]:
+    """Generate actionable suggestions to improve the resume."""
+    return await suggest_improvements_tool(user_id=user_id)
+
+
+@tool("get_resume_metrics", return_direct=False)
+async def agent_get_resume_metrics(user_id: str) -> dict[str, Any]:
+    """Return quantitative metrics like word counts, completeness, and diversity."""
+    return await get_resume_metrics_tool(user_id=user_id)
+
+
+@tool("recommend_courses", return_direct=False)
+async def agent_recommend_courses(user_id: str) -> dict[str, Any]:
+    """Provide general course recommendations for the user."""
+    return await recommend_courses_tool(user_id=user_id)
+
+
+@tool("recommend_courses_with_context", return_direct=False)
+async def agent_recommend_courses_with_context(user_id: str) -> dict[str, Any]:
+    """Provide context-aware course recommendations that leverage resume data."""
+    return await recommend_courses_with_context_tool(user_id=user_id)
+
+
 class AgentService:
-    """Enhanced LangChain agent with comprehensive resume analysis capabilities."""
+    """LangChain-powered agent that relies on tool-calling instead of manual routing."""
+
+    MAX_ITERATIONS = 4
 
     def __init__(self) -> None:
         self.model = ChatGoogleGenerativeAI(
             model=settings.model_name,
             temperature=settings.temperature,
         )
-        self.prompt = AgentPrompts.get_main_prompt()
-        self.chain = self.prompt | self.model
+        self.memory = ConversationMemory(max_messages=20)
+        self.tools = self._build_tools()
+        self.tool_lookup = {tool.name: tool for tool in self.tools}
+        self.tool_enabled_llm = self.model.bind_tools(self.tools)
 
-        # Comprehensive tool registry
-        self.tools: dict[str, Callable[..., Any]] = {
-            # Resume data tools
-            "get_contact_info": get_contact_info_tool,
-            "get_skills": get_skills_tool,
-            "get_experience": get_experience_tool,
-            "get_education": get_education_tool,
-            "get_projects": get_projects_tool,
-            "get_achievements": get_achievements_tool,
-            "get_co_curricular": get_co_curricular_tool,
-            "get_summary": get_summary_tool,
-            # Analysis tools
-            "analyze_resume_strengths": analyze_resume_strengths_tool,
-            "suggest_improvements": suggest_improvements_tool,
-            "get_resume_metrics": get_resume_metrics_tool,
-            # Course recommendation tools
-            "recommend_courses": recommend_courses_tool,
-            "recommend_courses_with_context": recommend_courses_with_context_tool,
-        }
+    def _build_tools(self) -> list:
+        """Register all agent tools."""
+        return [
+            agent_get_contact_info,
+            agent_get_skills,
+            agent_get_experience,
+            agent_get_education,
+            agent_get_projects,
+            agent_get_achievements,
+            agent_get_co_curricular,
+            agent_get_summary,
+            agent_analyze_resume_strengths,
+            agent_suggest_improvements,
+            agent_get_resume_metrics,
+            agent_recommend_courses,
+            agent_recommend_courses_with_context,
+        ]
 
-        # Intent patterns for better routing
-        self.intent_patterns = {
-            "contact": [
-                r"\b(email|phone|contact|address|location|where|reach)\b",
-                r"\b(how to contact|contact info|contact details)\b",
-            ],
-            "skills": [
-                r"\b(skills?|technologies?|programming|languages?|frameworks?|tools?)\b",
-                r"\b(what can you do|technical skills|competencies)\b",
-            ],
-            "experience": [
-                r"\b(experience|work|job|career|employment|position|role)\b",
-                r"\b(where have you worked|work history|professional experience)\b",
-            ],
-            "education": [
-                r"\b(education|degree|university|college|school|graduated|gpa)\b",
-                r"\b(where did you study|educational background|academic)\b",
-            ],
-            "projects": [
-                r"\b(projects?|portfolio|built|developed|created|github)\b",
-                r"\b(what have you built|show me your work|side projects)\b",
-            ],
-            "achievements": [
-                r"\b(achievements?|awards?|accomplishments?|recognition|honors?)\b",
-                r"\b(what are you proud of|notable achievements)\b",
-            ],
-            "co_curricular": [
-                r"\b(activities?|clubs?|societies?|volunteer|extracurricular|co.?curricular)\b",
-                r"\b(involvement|leadership|organizations?)\b",
-            ],
-            "analysis": [
-                r"\b(analyze|analysis|strengths?|weaknesses?|improve|feedback)\b",
-                r"\b(how good|rate|score|evaluate|review)\b",
-                r"\b(suggestions?|recommendations?|tips?|advice)\b",
-            ],
-            "courses": [
-                r"\b(courses?|learn|study|training|education|tutorial|bootcamp)\b",
-                r"\b(what should I learn|recommend courses|suggest courses)\b",
-                r"\b(skills to improve|upskill|reskill|professional development)\b",
-                r"\b(certification|certificate|course recommendations)\b",
-            ],
-            "summary": [
-                r"\b(summary|about|overview|introduction|profile)\b",
-                r"\b(who are you|tell me about yourself|background)\b",
-            ],
-        }
+    def _serialize_tool_result(self, result: Any) -> str:
+        """Ensure tool outputs are serialized for ToolMessages."""
+        try:
+            return json.dumps(result, default=str)
+        except TypeError:
+            return json.dumps({"result": str(result)})
 
-    def _detect_intent(self, message: str) -> list[str]:
-        """Detect user intent based on message content."""
-        message_lower = message.lower()
-        detected_intents = []
+    async def _invoke_tool(
+        self, tool_name: str | None, args: Dict[str, Any]
+    ) -> Any:
+        if not tool_name:
+            return {"error": "Tool name missing in model response."}
 
-        for intent, patterns in self.intent_patterns.items():
-            for pattern in patterns:
-                if re.search(pattern, message_lower):
-                    detected_intents.append(intent)
-                    break
+        tool = self.tool_lookup.get(tool_name)
+        if not tool:
+            return {"error": f"Tool '{tool_name}' is not registered."}
 
-        return detected_intents
+        try:
+            return await tool.ainvoke(args)
+        except Exception as exc:  # pragma: no cover - defensive
+            return {"error": f"{tool_name} failed: {str(exc)}"}
 
-    async def _execute_tools(
-        self, intents: list[str], user_id: str | None
-    ) -> dict[str, Any]:
-        """Execute tools based on detected intents."""
-        results = {}
-        actions_taken = []
-        context_only_tools = set()  # Track tools used only for context
+    def _finalize_text(self, ai_message: AIMessage) -> str:
+        """Normalize AI content into plain text."""
+        if isinstance(ai_message.content, str):
+            return ai_message.content
 
-        # Map intents to tools
-        intent_to_tool = {
-            "contact": "get_contact_info",
-            "skills": "get_skills",
-            "experience": "get_experience",
-            "education": "get_education",
-            "projects": "get_projects",
-            "achievements": "get_achievements",
-            "co_curricular": "get_co_curricular",
-            "summary": "get_summary",
-            "analysis": "analyze_resume_strengths",
-            # Note: "courses" intent is handled specially below for context-aware approach
-        }
+        if isinstance(ai_message.content, list):
+            parts = []
+            for chunk in ai_message.content:
+                if isinstance(chunk, dict) and "text" in chunk:
+                    parts.append(chunk["text"])
+            if parts:
+                return "\n".join(parts)
 
-        # Execute tools for detected intents (excluding courses which is handled separately)
-        for intent in intents:
-            if intent in intent_to_tool and intent != "courses":
-                tool_name = intent_to_tool[intent]
-                if tool_name in self.tools:
-                    try:
-                        tool_result = await self.tools[tool_name](user_id=user_id)
-                        results[tool_name] = tool_result
-                        actions_taken.append(tool_name)
-                        print(
-                            f"DEBUG: Tool {tool_name} executed successfully, result keys: {tool_result.keys() if isinstance(tool_result, dict) else 'Not a dict'}"
-                        )
-                    except Exception as e:
-                        results[f"{tool_name}_error"] = str(e)
-                        print(f"DEBUG: Tool {tool_name} failed with error: {e}")
-
-        # If analysis intent detected, also get suggestions
-        if "analysis" in intents and "suggest_improvements" in self.tools:
-            try:
-                suggestions = await self.tools["suggest_improvements"](user_id=user_id)
-                results["suggestions"] = suggestions
-                actions_taken.append("suggest_improvements")
-            except Exception as e:
-                results["suggestions_error"] = str(e)
-
-        # If courses intent detected, use context-aware approach
-        if "courses" in intents:
-            try:
-                # First, ensure we have skills and experience data for context
-                skills_data = results.get("get_skills", {})
-                experience_data = results.get("get_experience", [])
-
-                # If we don't have the data yet, fetch it (but mark as context-only)
-                if not skills_data or "error" in skills_data:
-                    try:
-                        skills_data = await self.tools["get_skills"](user_id=user_id)
-                        results["get_skills"] = skills_data
-                        context_only_tools.add("get_skills")
-                    except Exception:
-                        skills_data = {}
-
-                if not experience_data or "error" in experience_data:
-                    try:
-                        experience_data = await self.tools["get_experience"](
-                            user_id=user_id
-                        )
-                        results["get_experience"] = experience_data
-                        context_only_tools.add("get_experience")
-                    except Exception:
-                        experience_data = []
-
-                # Use context-aware course recommendation
-                print("DEBUG: Using context-aware course recommendation")
-                print(f"DEBUG: Skills data: {skills_data}")
-                print(f"DEBUG: Experience data: {experience_data}")
-
-                courses = await self.tools["recommend_courses_with_context"](
-                    skills_data=(skills_data if "error" not in skills_data else None),
-                    experience_data=(
-                        experience_data if "error" not in experience_data else None
-                    ),
-                    user_id=user_id,
-                )
-                results["recommend_courses"] = courses
-                actions_taken.append("recommend_courses_with_context")
-            except Exception:
-                # Fallback to basic course recommendation
-                try:
-                    courses = await self.tools["recommend_courses"](user_id=user_id)
-                    results["recommend_courses"] = courses
-                    actions_taken.append("recommend_courses")
-                except Exception as fallback_error:
-                    results["recommend_courses_error"] = str(fallback_error)
-
-        return {
-            "results": results,
-            "actions_taken": actions_taken,
-            "context_only_tools": context_only_tools,
-        }
-
-    def _format_response(
-        self,
-        tool_results: dict[str, Any],
-        actions_taken: list[str],
-        context_only_tools: set[str] | None = None,
-    ) -> str:
-        """Format a comprehensive response based on tool results."""
-        if context_only_tools is None:
-            context_only_tools = set()
-
-        if not tool_results or not actions_taken:
-            return (
-                "I couldn't find specific information to answer your question. "
-                "Please try asking about your contact info, skills, experience, "
-                "education, projects, achievements, or ask for resume analysis."
-            )
-
-        response_parts = []
-
-        # Handle course recommendations FIRST (most important for course queries)
-        if "recommend_courses" in tool_results:
-            courses_data = tool_results["recommend_courses"]
-            print(
-                f"DEBUG: Course data keys: "
-                f"{courses_data.keys() if isinstance(courses_data, dict) else 'Not a dict'}"
-            )
-            print(
-                f"DEBUG: Recommendations count: "
-                f"{len(courses_data.get('recommendations', []))}"
-            )
-
-            if "error" not in courses_data:
-                response_parts.append("**Course Recommendations:**\n")
-
-                # Show user profile analysis
-                if "user_profile" in courses_data:
-                    profile = courses_data["user_profile"]
-                    role = profile.get("primary_role", "general")
-                    skills_count = profile.get("total_skills", 0)
-                    if role != "general" and skills_count > 0:
-                        response_parts.append(
-                            f"Based on your profile as a **{role}** developer "
-                            f"with {skills_count} skills:"
-                        )
-                        key_skills = profile.get("key_skills", [])
-                        if key_skills:
-                            skills_str = ", ".join(key_skills[:5])
-                            response_parts.append(f"Key skills: {skills_str}")
-                        response_parts.append("")
-
-                # Show course recommendations
-                if "recommendations" in courses_data:
-                    recommendations = courses_data["recommendations"]
-                    if recommendations:
-                        response_parts.append("**Recommended Courses:**\n")
-                        for i, course in enumerate(recommendations[:8], 1):  # Top 8
-                            response_parts.append(f"{i}. **{course['title']}**")
-                            if course.get("platform"):
-                                response_parts.append(
-                                    f"   Platform: {course['platform']}"
-                                )
-                            if course.get("description"):
-                                response_parts.append(
-                                    f"   Description: {course['description']}"
-                                )
-                            if course.get("url"):
-                                response_parts.append(f"   URL: {course['url']}")
-                            response_parts.append("")
-                    else:
-                        response_parts.append(
-                            "I couldn't find specific course recommendations at the moment. "
-                            "Please try again or refine your request."
-                        )
-                        response_parts.append("")
-
-                # Show search queries used
-                if "search_queries_used" in courses_data:
-                    queries = courses_data["search_queries_used"]
-                    if queries:
-                        response_parts.append("**Search Strategy:**")
-                        response_parts.append(
-                            "I analyzed your profile and searched for courses using "
-                            "these criteria:"
-                        )
-                        for query in queries[:3]:  # Show top 3 queries
-                            response_parts.append(f"• {query}")
-                        response_parts.append("")
-
-        # Handle contact info
-        if "get_contact_info" in tool_results:
-            contact = tool_results["get_contact_info"]
-            if "error" not in contact:
-                response_parts.append("**Contact Information:**\n")
-                if contact.get("name"):
-                    response_parts.append(f"Name: {contact['name']}")
-                if contact.get("email"):
-                    response_parts.append(f"Email: {contact['email']}")
-                if contact.get("phone"):
-                    response_parts.append(f"Phone: {contact['phone']}")
-                if contact.get("location"):
-                    response_parts.append(f"Location: {contact['location']}")
-                response_parts.append("")
-
-        # Handle skills (only if explicitly requested, not context-only)
-        if "get_skills" in tool_results and "get_skills" not in context_only_tools:
-            skills = tool_results["get_skills"]
-            if "error" not in skills:
-                response_parts.append("**Technical Skills:**\n")
-                if skills.get("languages"):
-                    langs = ", ".join(skills["languages"])
-                    response_parts.append(f"Languages: {langs}")
-                if skills.get("frameworks"):
-                    frameworks = ", ".join(skills["frameworks"])
-                    response_parts.append(f"Frameworks: {frameworks}")
-                if skills.get("tools"):
-                    tools = ", ".join(skills["tools"])
-                    response_parts.append(f"Tools: {tools}")
-                total = skills.get("total_skills", 0)
-                response_parts.append(f"Total Skills: {total}")
-                response_parts.append("")
-
-        # Handle experience (only if explicitly requested, not context-only)
-        if "get_experience" in tool_results and "get_experience" not in context_only_tools:
-            experience = tool_results["get_experience"]
-            if "error" not in experience and experience:
-                response_parts.append("**Work Experience:**\n")
-                for i, exp in enumerate(experience[:3], 1):  # Show top 3
-                    if isinstance(exp, dict):
-                        role = exp.get("role", "Unknown Role")
-                        company = exp.get("company", "Unknown Company")
-                        period = exp.get("period", "")
-                        response_parts.append(f"{i}. **{role}** at {company}")
-                        if period:
-                            response_parts.append(f"   Period: {period}")
-                        if exp.get("details"):
-                            response_parts.append(
-                                "   Key responsibilities and achievements:"
-                            )
-                            for detail in exp["details"][:2]:  # Show top 2 details
-                                response_parts.append(f"   • {detail}")
-                        response_parts.append("")
-
-        # Handle projects
-        if "get_projects" in tool_results:
-            projects = tool_results["get_projects"]
-            if "error" not in projects and projects:
-                response_parts.append("**Projects:**\n")
-                for i, proj in enumerate(projects[:3], 1):  # Show top 3
-                    if isinstance(proj, dict):
-                        name = proj.get("name", "Unknown Project")
-                        tech_stack = proj.get("tech_stack", "")
-                        response_parts.append(f"{i}. **{name}**")
-                        if tech_stack:
-                            response_parts.append(f"   Tech Stack: {tech_stack}")
-                        if proj.get("details"):
-                            first_detail = proj["details"][0] if proj["details"] else ""
-                            response_parts.append(f"   Description: {first_detail}")
-                        response_parts.append("")
-
-        # Handle analysis
-        if "analyze_resume_strengths" in tool_results:
-            analysis = tool_results["analyze_resume_strengths"]
-            if "error" not in analysis:
-                response_parts.append("**Resume Analysis:**\n")
-                overall_score = analysis.get("overall_score", 0)
-                response_parts.append(f"Overall Score: {overall_score:.1f}/1.0")
-
-                if analysis.get("strengths"):
-                    response_parts.append("Strengths:")
-                    for strength in analysis["strengths"]:
-                        response_parts.append(f"• {strength}")
-
-                if analysis.get("areas_for_improvement"):
-                    response_parts.append("Areas for Improvement:")
-                    for area in analysis["areas_for_improvement"]:
-                        response_parts.append(f"• {area}")
-                response_parts.append("")
-
-        # Handle suggestions
-        if "suggestions" in tool_results:
-            suggestions = tool_results["suggestions"]
-            if "error" not in suggestions:
-                response_parts.append("**Recommendations:**\n")
-                if suggestions.get("priority_improvements"):
-                    response_parts.append("Priority Improvements:")
-                    for improvement in suggestions["priority_improvements"][:3]:
-                        response_parts.append(f"• {improvement['suggestion']}")
-                    response_parts.append("")
-
-
-        if response_parts:
-            return "\n".join(response_parts)
-        return (
-            "I found some information but couldn't format it properly. "
-            "Please try a more specific question."
-        )
+        return "I wasn't able to generate a detailed response this time."
 
     async def chat(self, user_id: str | None, message: str) -> dict[str, Any]:
-        """Enhanced chat method with intelligent tool routing and comprehensive responses."""
+        """Process a chat request using tool-calling with lightweight memory."""
         try:
-            # Detect user intent
-            intents = self._detect_intent(message)
+            history = self.memory.get(user_id)
+            messages: list = [SystemMessage(content=AgentPrompts.SYSTEM_PROMPT), *history]
 
-            # Execute relevant tools
-            tool_results = await self._execute_tools(intents, user_id)
+            user_message = HumanMessage(content=message)
+            messages.append(user_message)
+            self.memory.append(user_id, user_message)
 
-            # Format response
-            if tool_results["actions_taken"]:
-                formatted_message = self._format_response(
-                    tool_results["results"],
-                    tool_results["actions_taken"],
-                    tool_results.get("context_only_tools", set()),
+            actions_taken: list[str] = []
+            collected_data: Dict[str, list[Any]] = {}
+
+            for iteration in range(self.MAX_ITERATIONS):
+                ai_response: AIMessage = await self.tool_enabled_llm.ainvoke(
+                    messages, config=RunnableConfig()
                 )
-                return {
-                    "message": formatted_message,
-                    "data": tool_results["results"],
-                    "actions_taken": tool_results["actions_taken"],
-                    "confidence": 0.9,
-                }
-            else:
-                # Fallback to LLM for general questions
-                out = await self.chain.ainvoke(
-                    {"question": message}, config=RunnableConfig()
-                )
-                return {
-                    "message": str(out.content),
-                    "data": None,
-                    "actions_taken": [],
-                    "confidence": 0.7,
-                }
+                messages.append(ai_response)
+                self.memory.append(user_id, ai_response)
 
-        except Exception as e:
+                tool_calls = getattr(ai_response, "tool_calls", None) or []
+                if not tool_calls:
+                    final_message = self._finalize_text(ai_response)
+                    return {
+                        "message": final_message,
+                        "data": collected_data or None,
+                        "actions_taken": actions_taken,
+                        "confidence": 0.9 if actions_taken else 0.75,
+                    }
+
+                for call in tool_calls:
+                    tool_name = call.get("name")
+                    args = call.get("args") or {}
+                    if user_id:
+                        args["user_id"] = user_id
+
+                    result = await self._invoke_tool(tool_name, args)
+                    if tool_name:
+                        collected_data.setdefault(tool_name, []).append(result)
+                        if tool_name not in actions_taken:
+                            actions_taken.append(tool_name)
+
+                    tool_message = ToolMessage(
+                        content=self._serialize_tool_result(result),
+                        tool_call_id=call.get("id") or tool_name or f"tool_{iteration}",
+                    )
+                    messages.append(tool_message)
+                    self.memory.append(user_id, tool_message)
+
+            return {
+                "message": (
+                    "I reached the maximum number of tool calls and could not finish "
+                    "your request. Please try again with more specific instructions."
+                ),
+                "data": collected_data or None,
+                "actions_taken": actions_taken,
+                "confidence": 0.4,
+            }
+        except Exception as exc:  # pragma: no cover - defensive
             import traceback
 
             return {
-                "message": f"I encountered an error while processing your request: {str(e)}",
+                "message": f"I encountered an error while processing your request: {str(exc)}",
                 "data": None,
                 "actions_taken": [],
                 "confidence": 0.0,
