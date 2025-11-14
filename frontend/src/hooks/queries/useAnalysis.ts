@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
-import { API_BASE } from "@/lib/config";
 import type {
   AnalysisOverview,
   ATSScore,
@@ -33,10 +32,11 @@ export function useSkillsGap(userId: string | null, targetRole?: string) {
   return useQuery({
     queryKey: ["analysis", "skills-gap", userId, targetRole],
     queryFn: () => {
-      const url = new URL(`${API_BASE}/analysis/skills-gap`);
-      url.searchParams.set("user_id", userId!);
-      if (targetRole) url.searchParams.set("target_role", targetRole);
-      return apiRequest<SkillsGap>(url.pathname + url.search);
+      let endpoint = `/analysis/skills-gap?user_id=${userId}`;
+      if (targetRole) {
+        endpoint += `&target_role=${encodeURIComponent(targetRole)}`;
+      }
+      return apiRequest<SkillsGap>(endpoint);
     },
     enabled: !!userId,
   });
@@ -46,10 +46,11 @@ export function useJobMatch(userId: string | null, role?: string) {
   return useQuery({
     queryKey: ["analysis", "job-match", userId, role],
     queryFn: () => {
-      const url = new URL(`${API_BASE}/analysis/job-match`);
-      url.searchParams.set("user_id", userId!);
-      if (role) url.searchParams.set("role", role);
-      return apiRequest<JobMatch>(url.pathname + url.search);
+      let endpoint = `/analysis/job-match?user_id=${userId}`;
+      if (role) {
+        endpoint += `&role=${encodeURIComponent(role)}`;
+      }
+      return apiRequest<JobMatch>(endpoint);
     },
     enabled: !!userId,
   });

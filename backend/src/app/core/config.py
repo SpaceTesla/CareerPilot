@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     pgvector_enabled: bool = Field(
         default=True, description="Enable pgvector extension for embeddings"
     )
+    
+    # CORS configuration
+    cors_origins: str = Field(
+        default="*",
+        description="CORS allowed origins (comma-separated, use * for all)",
+    )
 
     @field_validator("google_api_key")
     @classmethod

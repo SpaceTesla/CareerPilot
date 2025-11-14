@@ -36,11 +36,12 @@ async def analyze_resume_strengths_tool(user_id: str | None) -> dict[str, Any]:
             "phone": getattr(profile, "phone", None),
             "location": getattr(profile, "location", None),
         }
-        contact_score = sum(1 for v in contact_info.values() if v)
+        contact_count = sum(1 for v in contact_info.values() if v)
+        contact_score = contact_count / 3  # Normalize to 0-1
         analysis["section_analysis"]["contact"] = {
             "score": contact_score,
-            "max_score": 3,
-            "completeness": f"{(contact_score / 3) * 100:.1f}%",
+            "max_score": 1,
+            "completeness": f"{(contact_score * 100):.1f}%",
         }
 
         # Skills Analysis
@@ -50,7 +51,8 @@ async def analyze_resume_strengths_tool(user_id: str | None) -> dict[str, Any]:
             + len(skills.get("frameworks", []))
             + len(skills.get("tools", []))
         )
-        skills_score = min(total_skills / 10, 1)  # Normalize to 0-1
+        # More lenient scoring: 5+ skills = full score, scale from 0-5
+        skills_score = min(total_skills / 5, 1) if total_skills > 0 else 0.1  # At least 10% if any skills exist
         analysis["section_analysis"]["skills"] = {
             "score": skills_score,
             "total_skills": total_skills,
@@ -63,7 +65,8 @@ async def analyze_resume_strengths_tool(user_id: str | None) -> dict[str, Any]:
 
         # Experience Analysis
         experience = raw_data.get("experience", [])
-        exp_score = min(len(experience) / 3, 1)  # Normalize to 0-1
+        # More lenient: 2+ experiences = full score, scale from 0-2
+        exp_score = min(len(experience) / 2, 1) if len(experience) > 0 else 0.1  # At least 10% if any experience
         analysis["section_analysis"]["experience"] = {
             "score": exp_score,
             "total_positions": len(experience),
@@ -72,7 +75,8 @@ async def analyze_resume_strengths_tool(user_id: str | None) -> dict[str, Any]:
 
         # Projects Analysis
         projects = raw_data.get("projects", [])
-        proj_score = min(len(projects) / 2, 1)  # Normalize to 0-1
+        # More lenient: 1+ project = full score, but give partial credit
+        proj_score = min(len(projects) / 1, 1) if len(projects) > 0 else 0.1  # At least 10% if any projects
         analysis["section_analysis"]["projects"] = {
             "score": proj_score,
             "total_projects": len(projects),
@@ -81,24 +85,46 @@ async def analyze_resume_strengths_tool(user_id: str | None) -> dict[str, Any]:
 
         # Education Analysis
         education = raw_data.get("education", [])
-        edu_score = min(len(education) / 2, 1)  # Normalize to 0-1
+        # More lenient: 1+ education = full score
+        edu_score = min(len(education) / 1, 1) if len(education) > 0 else 0.1  # At least 10% if any education
         analysis["section_analysis"]["education"] = {
             "score": edu_score,
             "total_degrees": len(education),
             "has_gpa": sum(1 for edu in education if edu.get("gpa")),
         }
 
-        # Calculate overall score
-        section_scores = [
-            analysis["section_analysis"][section]["score"]
-            for section in analysis["section_analysis"]
-        ]
+        # Summary Analysis (bonus)
+        summary = getattr(profile, "summary", None) or raw_data.get("summary", "")
+        has_summary = bool(summary and len(summary.strip()) > 20)
+        summary_score = 1.0 if has_summary else 0  # Binary: has summary or not
+        analysis["section_analysis"]["summary"] = {
+            "score": summary_score,
+            "has_summary": has_summary,
+        }
+
+        # Calculate overall score with weighted average
+        # Contact: 15%, Skills: 25%, Experience: 30%, Projects: 15%, Education: 10%, Summary: 5%
         analysis["overall_score"] = (
-            sum(section_scores) / len(section_scores) if section_scores else 0
+            contact_score * 0.15 +
+            skills_score * 0.25 +
+            exp_score * 0.30 +
+            proj_score * 0.15 +
+            edu_score * 0.10 +
+            summary_score * 0.05
         )
+        
+        # Ensure minimum score of 0.15 (15%) for any resume with data
+        if any([
+            contact_count > 0,
+            total_skills > 0,
+            len(experience) > 0,
+            len(projects) > 0,
+            len(education) > 0,
+        ]):
+            analysis["overall_score"] = max(analysis["overall_score"], 0.15)
 
         # Generate strengths and improvements
-        if contact_score >= 2:
+        if contact_count >= 2:
             analysis["strengths"].append("Complete contact information")
         if total_skills >= 5:
             analysis["strengths"].append("Strong technical skills profile")
@@ -107,7 +133,7 @@ async def analyze_resume_strengths_tool(user_id: str | None) -> dict[str, Any]:
         if len(projects) >= 1:
             analysis["strengths"].append("Project portfolio demonstrates skills")
 
-        if contact_score < 2:
+        if contact_count < 2:
             analysis["areas_for_improvement"].append("Add missing contact information")
         if total_skills < 5:
             analysis["areas_for_improvement"].append("Expand technical skills section")

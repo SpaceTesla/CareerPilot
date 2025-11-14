@@ -9,7 +9,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Send, Bot, User } from "lucide-react";
 import { apiRequest } from "@/lib/api";
-import { API_BASE } from "@/lib/config";
 import { toast } from "sonner";
 
 interface Message {
@@ -61,11 +60,17 @@ export default function ChatWidget({ userId }: ChatWidgetProps) {
     try {
       const sessionId = localStorage.getItem("cp_session_id");
 
-      const data = await fetch(`${API_BASE}/agent/chat`, {
+      const data = await apiRequest<{
+        message: string;
+        data?: Record<string, unknown> | null;
+        sources?: string[];
+        actions_taken?: string[];
+        confidence?: number;
+        model?: string | null;
+        timestamp?: string;
+        success?: boolean;
+      }>(`/agent/chat`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           message: userMessage.content,
           user_id: userId,
@@ -73,9 +78,6 @@ export default function ChatWidget({ userId }: ChatWidgetProps) {
           include_sources: true,
           context: {},
         }),
-      }).then((res) => {
-        if (!res.ok) throw new Error("Failed to get response");
-        return res.json();
       });
 
       const aiMessage: Message = {
