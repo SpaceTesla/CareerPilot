@@ -127,6 +127,7 @@ class AgentService:
         """Execute tools based on detected intents."""
         results = {}
         actions_taken = []
+        context_only_tools = set()  # Track tools used only for context
 
         # Map intents to tools
         intent_to_tool = {
@@ -139,12 +140,12 @@ class AgentService:
             "co_curricular": "get_co_curricular",
             "summary": "get_summary",
             "analysis": "analyze_resume_strengths",
-            "courses": "recommend_courses",
+            # Note: "courses" intent is handled specially below for context-aware approach
         }
 
-        # Execute tools for detected intents
+        # Execute tools for detected intents (excluding courses which is handled separately)
         for intent in intents:
-            if intent in intent_to_tool:
+            if intent in intent_to_tool and intent != "courses":
                 tool_name = intent_to_tool[intent]
                 if tool_name in self.tools:
                     try:
@@ -168,13 +169,36 @@ class AgentService:
                 results["suggestions_error"] = str(e)
 
         # If courses intent detected, use context-aware approach
-        if "courses" in intents and "recommend_courses_with_context" in self.tools:
+        if "courses" in intents:
             try:
-                # Get skills and experience data for context
+                # First, ensure we have skills and experience data for context
                 skills_data = results.get("get_skills", {})
                 experience_data = results.get("get_experience", [])
 
+                # If we don't have the data yet, fetch it (but mark as context-only)
+                if not skills_data or "error" in skills_data:
+                    try:
+                        skills_data = await self.tools["get_skills"](user_id=user_id)
+                        results["get_skills"] = skills_data
+                        context_only_tools.add("get_skills")
+                    except Exception:
+                        skills_data = {}
+
+                if not experience_data or "error" in experience_data:
+                    try:
+                        experience_data = await self.tools["get_experience"](
+                            user_id=user_id
+                        )
+                        results["get_experience"] = experience_data
+                        context_only_tools.add("get_experience")
+                    except Exception:
+                        experience_data = []
+
                 # Use context-aware course recommendation
+                print("DEBUG: Using context-aware course recommendation")
+                print(f"DEBUG: Skills data: {skills_data}")
+                print(f"DEBUG: Experience data: {experience_data}")
+
                 courses = await self.tools["recommend_courses_with_context"](
                     skills_data=(skills_data if "error" not in skills_data else None),
                     experience_data=(
@@ -193,12 +217,22 @@ class AgentService:
                 except Exception as fallback_error:
                     results["recommend_courses_error"] = str(fallback_error)
 
-        return {"results": results, "actions_taken": actions_taken}
+        return {
+            "results": results,
+            "actions_taken": actions_taken,
+            "context_only_tools": context_only_tools,
+        }
 
     def _format_response(
-        self, tool_results: dict[str, Any], actions_taken: list[str]
+        self,
+        tool_results: dict[str, Any],
+        actions_taken: list[str],
+        context_only_tools: set[str] | None = None,
     ) -> str:
         """Format a comprehensive response based on tool results."""
+        if context_only_tools is None:
+            context_only_tools = set()
+
         if not tool_results or not actions_taken:
             return (
                 "I couldn't find specific information to answer your question. "
@@ -207,6 +241,75 @@ class AgentService:
             )
 
         response_parts = []
+
+        # Handle course recommendations FIRST (most important for course queries)
+        if "recommend_courses" in tool_results:
+            courses_data = tool_results["recommend_courses"]
+            print(
+                f"DEBUG: Course data keys: "
+                f"{courses_data.keys() if isinstance(courses_data, dict) else 'Not a dict'}"
+            )
+            print(
+                f"DEBUG: Recommendations count: "
+                f"{len(courses_data.get('recommendations', []))}"
+            )
+
+            if "error" not in courses_data:
+                response_parts.append("**Course Recommendations:**\n")
+
+                # Show user profile analysis
+                if "user_profile" in courses_data:
+                    profile = courses_data["user_profile"]
+                    role = profile.get("primary_role", "general")
+                    skills_count = profile.get("total_skills", 0)
+                    if role != "general" and skills_count > 0:
+                        response_parts.append(
+                            f"Based on your profile as a **{role}** developer "
+                            f"with {skills_count} skills:"
+                        )
+                        key_skills = profile.get("key_skills", [])
+                        if key_skills:
+                            skills_str = ", ".join(key_skills[:5])
+                            response_parts.append(f"Key skills: {skills_str}")
+                        response_parts.append("")
+
+                # Show course recommendations
+                if "recommendations" in courses_data:
+                    recommendations = courses_data["recommendations"]
+                    if recommendations:
+                        response_parts.append("**Recommended Courses:**\n")
+                        for i, course in enumerate(recommendations[:8], 1):  # Top 8
+                            response_parts.append(f"{i}. **{course['title']}**")
+                            if course.get("platform"):
+                                response_parts.append(
+                                    f"   Platform: {course['platform']}"
+                                )
+                            if course.get("description"):
+                                response_parts.append(
+                                    f"   Description: {course['description']}"
+                                )
+                            if course.get("url"):
+                                response_parts.append(f"   URL: {course['url']}")
+                            response_parts.append("")
+                    else:
+                        response_parts.append(
+                            "I couldn't find specific course recommendations at the moment. "
+                            "Please try again or refine your request."
+                        )
+                        response_parts.append("")
+
+                # Show search queries used
+                if "search_queries_used" in courses_data:
+                    queries = courses_data["search_queries_used"]
+                    if queries:
+                        response_parts.append("**Search Strategy:**")
+                        response_parts.append(
+                            "I analyzed your profile and searched for courses using "
+                            "these criteria:"
+                        )
+                        for query in queries[:3]:  # Show top 3 queries
+                            response_parts.append(f"• {query}")
+                        response_parts.append("")
 
         # Handle contact info
         if "get_contact_info" in tool_results:
@@ -223,8 +326,8 @@ class AgentService:
                     response_parts.append(f"Location: {contact['location']}")
                 response_parts.append("")
 
-        # Handle skills
-        if "get_skills" in tool_results:
+        # Handle skills (only if explicitly requested, not context-only)
+        if "get_skills" in tool_results and "get_skills" not in context_only_tools:
             skills = tool_results["get_skills"]
             if "error" not in skills:
                 response_parts.append("**Technical Skills:**\n")
@@ -241,8 +344,8 @@ class AgentService:
                 response_parts.append(f"Total Skills: {total}")
                 response_parts.append("")
 
-        # Handle experience
-        if "get_experience" in tool_results:
+        # Handle experience (only if explicitly requested, not context-only)
+        if "get_experience" in tool_results and "get_experience" not in context_only_tools:
             experience = tool_results["get_experience"]
             if "error" not in experience and experience:
                 response_parts.append("**Work Experience:**\n")
@@ -309,57 +412,6 @@ class AgentService:
                         response_parts.append(f"• {improvement['suggestion']}")
                     response_parts.append("")
 
-        # Handle course recommendations
-        if "recommend_courses" in tool_results:
-            courses_data = tool_results["recommend_courses"]
-            print(
-                f"DEBUG: Course data keys: "
-                f"{courses_data.keys() if isinstance(courses_data, dict) else 'Not a dict'}"
-            )
-            print(
-                f"DEBUG: Recommendations count: "
-                f"{len(courses_data.get('recommendations', []))}"
-            )
-
-            if "error" not in courses_data:
-                response_parts.append("**Course Recommendations:**\n")
-
-                # Show user profile analysis
-                if "user_profile" in courses_data:
-                    profile = courses_data["user_profile"]
-                    role = profile["primary_role"]
-                    skills_count = profile["total_skills"]
-                    response_parts.append(
-                        f"Based on your profile as a **{role}** developer "
-                        f"with {skills_count} skills:"
-                    )
-                    key_skills = ", ".join(profile["key_skills"])
-                    response_parts.append(f"Key skills: {key_skills}")
-                    response_parts.append("")
-
-                # Show course recommendations
-                if "recommendations" in courses_data:
-                    recommendations = courses_data["recommendations"]
-                    response_parts.append("**Recommended Courses:**\n")
-                    for i, course in enumerate(recommendations[:5], 1):  # Top 5
-                        response_parts.append(f"{i}. **{course['title']}**")
-                        response_parts.append(f"   Platform: {course['platform']}")
-                        response_parts.append(
-                            f"   Description: {course['description']}"
-                        )
-                        response_parts.append("")
-
-                # Show search queries used
-                if "search_queries_used" in courses_data:
-                    queries = courses_data["search_queries_used"]
-                    response_parts.append("**Search Strategy:**")
-                    response_parts.append(
-                        "I analyzed your resume and searched for courses using "
-                        "these criteria:"
-                    )
-                    for query in queries:
-                        response_parts.append(f"• {query}")
-                    response_parts.append("")
 
         if response_parts:
             return "\n".join(response_parts)
@@ -380,7 +432,9 @@ class AgentService:
             # Format response
             if tool_results["actions_taken"]:
                 formatted_message = self._format_response(
-                    tool_results["results"], tool_results["actions_taken"]
+                    tool_results["results"],
+                    tool_results["actions_taken"],
+                    tool_results.get("context_only_tools", set()),
                 )
                 return {
                     "message": formatted_message,

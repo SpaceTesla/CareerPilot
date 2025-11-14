@@ -1,0 +1,40 @@
+name: careerpilot-db-init
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: careerpilot-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: careerpilot
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  db-init:
+    build:
+      context: .
+    image: careerpilot-backend:latest
+    container_name: careerpilot-db-init
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.local
+    working_dir: /app
+    environment:
+      PYTHONPATH: /app/src
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/careerpilot
+      PGVECTOR_ENABLED: "true"
+    command:
+      ["uv", "run", "python", "-m", "app.infrastructure.database.init_db"]
+
+volumes:
+  postgres_data:

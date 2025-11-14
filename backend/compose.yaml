@@ -61,11 +61,11 @@ services:
       retries: 5
 
   db-init:
+    build:
+      context: .
     image: careerpilot-backend:latest
     container_name: careerpilot-db-init
     depends_on:
-      api:
-        condition: service_started
       db:
         condition: service_healthy
     env_file:
