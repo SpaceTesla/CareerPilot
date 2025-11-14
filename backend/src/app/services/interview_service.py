@@ -207,6 +207,147 @@ Format each question clearly and indicate the type (Technical/Behavioral/Project
             "format": "STAR (Situation, Task, Action, Result)",
         }
 
+    async def evaluate_answer(
+        self,
+        user_id: str | None,
+        question: str,
+        answer: str,
+        question_type: str | None = None,
+    ) -> dict[str, Any]:
+        """Evaluate user's answer with AI feedback."""
+        if not user_id:
+            return {"error": "User ID is required"}
+
+        context = self._load_resume_context(user_id)
+        if not context:
+            return {"error": "No resume found"}
+
+        # Build evaluation prompt
+        question_type_str = question_type or "general"
+        skills_summary = ", ".join(
+            context.get("skills", {}).get("languages", [])[:5]
+        )
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are an expert interview coach providing constructive feedback on interview answers."),
+            ("user", f"""Evaluate this interview answer:
+
+Question: {question}
+Question Type: {question_type_str}
+Candidate's Answer: {answer}
+
+Candidate Profile:
+- Skills: {skills_summary}
+- Experience: {len(context.get('experience', []))} positions
+
+Provide detailed feedback including:
+1. Strengths of the answer (what they did well)
+2. Areas for improvement (what could be better)
+3. Specific suggestions for enhancement
+4. Score out of 10 for:
+   - Clarity and structure
+   - Relevance to question
+   - Use of examples/STAR method (if behavioral)
+   - Technical accuracy (if technical)
+5. Sample improved answer (optional)
+
+Format as JSON with keys: strengths, improvements, suggestions, scores, sample_answer."""),
+        ])
+
+        chain = prompt | self.llm | StrOutputParser()
+
+        try:
+            feedback_text = await chain.ainvoke({})
+            
+            # Try to parse as JSON, fallback to text
+            import json
+            try:
+                feedback = json.loads(feedback_text)
+            except json.JSONDecodeError:
+                # If not JSON, create structured response from text
+                feedback = {
+                    "strengths": ["Answer provided"],
+                    "improvements": ["Could be more structured"],
+                    "suggestions": [feedback_text[:200]],
+                    "scores": {
+                        "clarity": 6,
+                        "relevance": 6,
+                        "examples": 5,
+                        "technical": 5,
+                    },
+                    "sample_answer": None,
+                    "raw_feedback": feedback_text,
+                }
+
+            return {
+                "question": question,
+                "question_type": question_type_str,
+                "feedback": feedback,
+                "overall_score": sum(feedback.get("scores", {}).values()) / len(feedback.get("scores", {})) if feedback.get("scores") else 6,
+            }
+        except Exception as e:
+            return {"error": f"Failed to evaluate answer: {str(e)}"}
+
+    async def get_questions_by_category(
+        self,
+        user_id: str | None,
+        category: str | None = None,
+    ) -> dict[str, Any]:
+        """Get interview questions by category."""
+        if not user_id:
+            return {"error": "User ID is required"}
+
+        # Load resume data
+        skills_data = await get_skills_tool(user_id)
+        experience_data = await get_experience_tool(user_id)
+
+        if "error" in skills_data:
+            return skills_data
+
+        # Build context
+        context_parts = []
+        if experience_data and not isinstance(experience_data, dict):
+            context_parts.append(f"Work experience: {len(experience_data)} positions")
+        if skills_data and not isinstance(skills_data, dict):
+            languages = skills_data.get("languages", [])
+            if languages:
+                context_parts.append(f"Programming languages: {', '.join(languages[:5])}")
+
+        context_str = ". ".join(context_parts)
+        category = category or "all"
+
+        # Adjust prompt based on category
+        if category == "technical":
+            question_prompt = "Generate 5-7 technical interview questions relevant to their programming skills and technologies."
+        elif category == "behavioral":
+            question_prompt = "Generate 5-7 behavioral interview questions that can be answered using the STAR method."
+        elif category == "situational":
+            question_prompt = "Generate 5-7 situational interview questions about problem-solving and decision-making."
+        else:
+            question_prompt = "Generate 10 interview questions with a mix of technical, behavioral, and situational questions."
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are an expert interviewer. Generate relevant interview questions."),
+            ("user", f"""Based on this candidate profile:
+{context_str}
+
+{question_prompt}
+
+Format each question clearly and indicate the type (Technical/Behavioral/Situational)."""),
+        ])
+
+        chain = prompt | self.llm | StrOutputParser()
+
+        try:
+            questions_text = await chain.ainvoke({})
+            return {
+                "questions": questions_text,
+                "category": category,
+                "categories": ["Technical", "Behavioral", "Situational"],
+            }
+        except Exception as e:
+            return {"error": f"Failed to generate questions: {str(e)}"}
+
 
 # Singleton instance
 interview_service = InterviewService()

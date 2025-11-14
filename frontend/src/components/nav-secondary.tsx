@@ -1,0 +1,46 @@
+"use client";
+
+import * as React from "react";
+import { type LucideIcon } from "lucide-react";
+import Link from "next/link";
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
+
+interface NavSecondaryProps {
+  items: {
+    title: string;
+    url: string;
+    icon: LucideIcon;
+  }[];
+  className?: string;
+}
+
+export function NavSecondary({
+  items,
+  className,
+  ...props
+}: NavSecondaryProps & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
+  return (
+    <SidebarGroup {...props} className={className}>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {items.map((item) => (
+            <SidebarMenuItem key={item.title}>
+              <SidebarMenuButton asChild tooltip={item.title}>
+                <Link href={item.url}>
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.title}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}

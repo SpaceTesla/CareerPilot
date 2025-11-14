@@ -60,78 +60,72 @@ export default function ResumeScoreCard({ data }: ResumeScoreCardProps) {
   };
 
   return (
-    <Card className="relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
-      <CardHeader className="relative">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-2xl font-bold">Overall Resume Score</CardTitle>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="truncate">Resume Score</CardTitle>
           <Badge
             variant="outline"
             className={cn(
-              "text-lg font-semibold px-4 py-1.5 border-2",
+              "text-sm font-semibold px-3 py-1 border-2 flex-shrink-0",
               getGradeColor(grade)
             )}
           >
-            <Award className="mr-2 h-4 w-4" />
+            <Award className="mr-2 h-3 w-3" />
             Grade: {grade}
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="relative">
-        <div className="flex items-center justify-between gap-8">
-          {/* Circular Progress */}
-          <div className="relative w-32 h-32 flex-shrink-0">
-            <svg className="transform -rotate-90 w-32 h-32">
-              <circle
-                cx="64"
-                cy="64"
-                r="56"
-                stroke="currentColor"
-                strokeWidth="8"
-                fill="none"
-                className="text-muted"
-              />
-              <circle
-                cx="64"
-                cy="64"
-                r="56"
-                stroke="currentColor"
-                strokeWidth="8"
-                fill="none"
-                strokeDasharray={`${(percentage / 100) * 351.86} 351.86`}
-                className={getScoreColor(score)}
-                strokeLinecap="round"
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <span className={cn("text-4xl font-bold block", getScoreColor(score))}>
-                  {percentage}
-                </span>
-                <span className="text-xs text-muted-foreground">/ 100</span>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex items-start gap-6">
+            <div className="relative w-24 h-24 flex-shrink-0">
+              <svg className="transform -rotate-90 w-24 h-24">
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="42"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  fill="none"
+                  className="text-muted"
+                />
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="42"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  fill="none"
+                  strokeDasharray={`${(percentage / 100) * 263.89} 263.89`}
+                  className={getScoreColor(score)}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <span className={cn("text-2xl font-bold block", getScoreColor(score))}>
+                    {percentage}
+                  </span>
+                  <span className="text-xs text-muted-foreground">/ 100</span>
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* Details */}
-          <div className="flex-1 space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Score Breakdown</p>
-              <Progress value={percentage} className="h-3 mb-2" />
-              <p className="text-sm font-medium">
+            <div className="flex-1 space-y-2 min-w-0">
+              <p className="text-sm font-medium break-words">
                 Your resume scores {percentage} out of 100
               </p>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <TrendingUp className="h-4 w-4" />
-              <span>
-                {percentage >= 80
-                  ? "Excellent! Your resume is well-optimized."
-                  : percentage >= 60
-                  ? "Good! There's room for improvement."
-                  : "Needs work. Check the recommendations below."}
-              </span>
+              <Progress value={percentage} className="h-2" />
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <TrendingUp className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span className="break-words">
+                  {percentage >= 80
+                    ? "Excellent! Your resume is well-optimized."
+                    : percentage >= 60
+                    ? "Good! There's room for improvement."
+                    : "Needs work. Check the recommendations below."}
+                </span>
+              </div>
             </div>
           </div>
         </div>

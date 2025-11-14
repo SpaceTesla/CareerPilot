@@ -57,7 +57,7 @@ export default function SectionAnalysis({ data }: SectionAnalysisProps) {
         <CardTitle>Section-by-Section Analysis</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {sections.map(([sectionName, sectionData]) => {
             const score = sectionData.score;
             const maxScore = sectionData.max_score;
@@ -68,14 +68,14 @@ export default function SectionAnalysis({ data }: SectionAnalysisProps) {
             return (
               <Card key={sectionName} className="hover:shadow-md transition-shadow">
                 <CardContent className="pt-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-sm">
+                  <div className="flex items-start justify-between mb-3 gap-2">
+                    <h3 className="font-semibold text-sm break-words flex-1 min-w-0">
                       {formatSectionName(sectionName)}
                     </h3>
                     <Badge
                       variant="outline"
                       className={cn(
-                        "font-semibold",
+                        "font-semibold flex-shrink-0",
                         getScoreColor(score, maxScore)
                       )}
                     >
@@ -86,26 +86,28 @@ export default function SectionAnalysis({ data }: SectionAnalysisProps) {
                     value={percentage}
                     className="h-2 mb-3"
                   />
-                  {sectionData.completeness && (
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Completeness: {sectionData.completeness}
-                    </p>
-                  )}
-                  {sectionData.total_skills !== undefined && (
-                    <p className="text-xs text-muted-foreground">
-                      Total Skills: {sectionData.total_skills}
-                    </p>
-                  )}
-                  {sectionData.total_positions !== undefined && (
-                    <p className="text-xs text-muted-foreground">
-                      Positions: {sectionData.total_positions}
-                    </p>
-                  )}
-                  {sectionData.total_projects !== undefined && (
-                    <p className="text-xs text-muted-foreground">
-                      Projects: {sectionData.total_projects}
-                    </p>
-                  )}
+                  <div className="space-y-1">
+                    {sectionData.completeness && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        Completeness: {sectionData.completeness}
+                      </p>
+                    )}
+                    {sectionData.total_skills !== undefined && (
+                      <p className="text-xs text-muted-foreground">
+                        Skills: {sectionData.total_skills}
+                      </p>
+                    )}
+                    {sectionData.total_positions !== undefined && (
+                      <p className="text-xs text-muted-foreground">
+                        Positions: {sectionData.total_positions}
+                      </p>
+                    )}
+                    {sectionData.total_projects !== undefined && (
+                      <p className="text-xs text-muted-foreground">
+                        Projects: {sectionData.total_projects}
+                      </p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );
