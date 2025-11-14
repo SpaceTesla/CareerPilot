@@ -21,6 +21,10 @@ class ResumeRepository:
         stmt = select(ResumeProfile).where(ResumeProfile.user_id == user_id)
         return list(self.session.scalars(stmt).all())
 
+    def get_by_id(self, profile_id: str) -> ResumeProfile | None:
+        """Get a resume profile by its ID."""
+        return self.session.get(ResumeProfile, profile_id)
+
     def update_profile(
         self, profile_id: str, updates: dict[str, Any]
     ) -> ResumeProfile | None:

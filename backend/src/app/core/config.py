@@ -20,6 +20,14 @@ class Settings(BaseSettings):
     app_version: str = Field(default="0.1.0", description="Application version")
 
     tavily_api_key: str = Field(..., description="Tavily API key")
+    
+    # Job search API (JSearch from RapidAPI - optional, falls back to Tavily if not set)
+    jsearch_api_key: str | None = Field(
+        default=None, description="JSearch API key from RapidAPI (optional)"
+    )
+    jsearch_api_host: str = Field(
+        default="jsearch.p.rapidapi.com", description="JSearch API host"
+    )
 
     google_api_key: str = Field(..., description="Google API key for Gemini")
     model_name: str = Field(default=Models.FLASH, description="Gemini model to use")

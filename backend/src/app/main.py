@@ -8,8 +8,13 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.api.v1.agent import router as agent_router
+from app.api.v1.analysis import router as analysis_router
 from app.api.v1.chat import router as chat_router
+from app.api.v1.courses import router as courses_router
 from app.api.v1.index import router as index_router
+from app.api.v1.interview import router as interview_router
+from app.api.v1.jobs import router as jobs_router
+from app.api.v1.progress import router as progress_router
 from app.api.v1.resume import router as resume_router
 from app.core.config import settings
 from app.core.logging import get_logger, setup_logging
@@ -53,6 +58,11 @@ app.include_router(index_router)
 app.include_router(chat_router)
 app.include_router(agent_router)
 app.include_router(resume_router)
+app.include_router(analysis_router)
+app.include_router(jobs_router)
+app.include_router(interview_router)
+app.include_router(progress_router)
+app.include_router(courses_router)
 
 # Create static directory if it doesn't exist
 static_dir = "static"
