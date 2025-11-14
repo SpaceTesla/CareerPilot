@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CareerPilot",
-  description: "AI-powered career guidance and resume analysis",
+  title: "CareerPilot - AI-Powered Career Guidance",
+  description: "Transform your career with AI-powered resume analysis, job matching, interview prep, and personalized career guidance",
 };
 
 export default function RootLayout({

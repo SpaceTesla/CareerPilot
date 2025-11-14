@@ -46,12 +46,8 @@ export default function Home() {
 
       toast.success("Resume uploaded successfully!");
       
-      // Redirect to analysis dashboard
-      if (data.profile_id) {
-        router.push(`/analysis?profile_id=${data.profile_id}`);
-      } else {
-        router.push("/analysis");
-      }
+      // Redirect to dashboard overview
+      router.push("/dashboard/overview");
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to upload resume");

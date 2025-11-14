@@ -145,7 +145,7 @@ export default function ATSScoreCard({ userId }: ATSScoreCardProps) {
                 {data.optimization_tips.slice(0, 3).map((tip, idx) => (
                   <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
                     <span className="text-primary mt-0.5">•</span>
-                    {tip}
+                    <span>{tip}</span>
                   </li>
                 ))}
               </ul>

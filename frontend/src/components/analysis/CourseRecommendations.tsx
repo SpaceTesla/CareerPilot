@@ -19,16 +19,26 @@ interface CourseRecommendation {
   provider?: string;
 }
 
+interface CourseRecommendationsResponse {
+  courses?: CourseRecommendation[];
+  total?: number;
+  role_focus?: string;
+  message?: string;
+}
+
 export default function CourseRecommendations({
   userId,
 }: CourseRecommendationsProps) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<CourseRecommendationsResponse>({
     queryKey: ["courses", "recommendations", userId],
-    queryFn: () => apiRequest(`/courses/recommendations?user_id=${userId}&limit=10`),
+    queryFn: () =>
+      apiRequest<CourseRecommendationsResponse>(
+        `/courses/recommendations?user_id=${userId}&limit=10`
+      ),
     enabled: !!userId,
   });
 
-  const courses = (data?.courses as CourseRecommendation[]) || [];
+  const courses = data?.courses || [];
 
   if (isLoading) {
     return (

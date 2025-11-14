@@ -26,7 +26,7 @@ export async function exportAnalysisReport(
   // Title
   doc.setFontSize(20);
   doc.setFont("helvetica", "bold");
-  doc.text("Resume Analysis Report", pageWidth / 2, yPosition, {
+  doc.text("CareerPilot Analysis Report", pageWidth / 2, yPosition, {
     align: "center",
   });
   yPosition += 10;
