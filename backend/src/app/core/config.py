@@ -2,7 +2,7 @@ import re
 
 from dotenv import load_dotenv
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv(".env.local")
 
@@ -18,6 +18,8 @@ class Models:
 class Settings(BaseSettings):
     app_name: str = Field(default="CareerPilot", description="Application name")
     app_version: str = Field(default="0.1.0", description="Application version")
+
+    tavily_api_key: str = Field(..., description="Tavily API key")
 
     google_api_key: str = Field(..., description="Google API key for Gemini")
     model_name: str = Field(default=Models.FLASH, description="Gemini model to use")
@@ -61,10 +63,12 @@ class Settings(BaseSettings):
             raise ValueError(f"Model must be one of: {', '.join(valid_models)}")
         return v
 
-    class Config:
-        env_file = ".env.local"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env.local",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",  # Ignore extra fields from env file
+    )
 
 
 settings = Settings()
