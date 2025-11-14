@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FadeIn } from "@/components/animations/fade-in";
 import SkillsGapChart from "@/components/analysis/SkillsGapChart";
 import ATSKeywordHighlight from "@/components/analysis/ATSKeywordHighlight";
 
@@ -17,13 +16,8 @@ export default function SkillsPage() {
 
   return (
     <div className="space-y-6">
-      <FadeIn>
-        <SkillsGapChart userId={userId} />
-      </FadeIn>
-      <FadeIn delay={0.1}>
-        <ATSKeywordHighlight userId={userId} />
-      </FadeIn>
+      <SkillsGapChart userId={userId} />
+      <ATSKeywordHighlight userId={userId} />
     </div>
   );
 }
-

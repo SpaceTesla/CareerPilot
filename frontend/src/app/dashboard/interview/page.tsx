@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FadeIn } from "@/components/animations/fade-in";
 import InterviewPrepTips from "@/components/analysis/InterviewPrepTips";
 import InterviewPractice from "@/components/analysis/InterviewPractice";
 
@@ -17,13 +16,8 @@ export default function InterviewPage() {
 
   return (
     <div className="space-y-6">
-      <FadeIn>
-        <InterviewPrepTips userId={userId} />
-      </FadeIn>
-      <FadeIn delay={0.1}>
-        <InterviewPractice userId={userId} />
-      </FadeIn>
+      <InterviewPrepTips userId={userId} />
+      <InterviewPractice userId={userId} />
     </div>
   );
 }
-

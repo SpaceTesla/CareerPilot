@@ -3,7 +3,13 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -45,7 +51,7 @@ export default function Home() {
       }
 
       toast.success("Resume uploaded successfully!");
-      
+
       // Redirect to dashboard overview
       router.push("/dashboard/overview");
     },
@@ -64,21 +70,18 @@ export default function Home() {
     }
   }, []);
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setDragActive(false);
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
 
-      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-        const droppedFile = e.dataTransfer.files[0];
-        if (validateFile(droppedFile)) {
-          setFile(droppedFile);
-        }
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const droppedFile = e.dataTransfer.files[0];
+      if (validateFile(droppedFile)) {
+        setFile(droppedFile);
       }
-    },
-    []
-  );
+    }
+  }, []);
 
   const validateFile = (selectedFile: File): boolean => {
     const allowedTypes = ["application/pdf", "text/markdown", "text/plain"];

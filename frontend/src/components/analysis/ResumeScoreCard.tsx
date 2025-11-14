@@ -67,7 +67,7 @@ export default function ResumeScoreCard({ data }: ResumeScoreCardProps) {
           <Badge
             variant="outline"
             className={cn(
-              "text-sm font-semibold px-3 py-1 border-2 flex-shrink-0",
+              "text-sm font-semibold px-3 py-1 flex-shrink-0",
               getGradeColor(grade)
             )}
           >

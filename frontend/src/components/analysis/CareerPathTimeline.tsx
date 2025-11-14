@@ -49,8 +49,8 @@ export default function CareerPathTimeline({
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Current Focus */}
-        <div>
-          <h3 className="text-sm font-medium text-muted-foreground mb-2">
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground">
             Current Focus
           </h3>
           <Badge variant="secondary" className="text-base px-4 py-2">
@@ -64,26 +64,26 @@ export default function CareerPathTimeline({
             <h3 className="text-lg font-semibold mb-4">Recommended Career Paths</h3>
             <div className="space-y-4">
               {data.career_paths.map((path, idx) => (
-                <div key={idx} className="relative pl-6">
-                  <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary" />
-                  <div className="absolute left-0 top-2 w-3 h-3 rounded-full bg-primary -translate-x-1.5" />
-                  <Card className="ml-4 hover:shadow-md transition-shadow">
+                <div key={idx} className="relative pl-8">
+                  <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary/20" />
+                  <div className="absolute left-0 top-3 w-4 h-4 rounded-full bg-primary border-2 border-background -translate-x-2.5 z-10" />
+                  <Card className="ml-6 hover:shadow-md transition-all duration-200 border-l-4 border-l-primary/50">
                     <CardContent className="pt-6">
-                      <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-start justify-between mb-3">
                         <h4 className="font-semibold text-lg">{path.title}</h4>
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs shrink-0">
                           {path.timeline}
                         </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground mb-3">
+                      <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
                         {path.description}
                       </p>
                       {path.required_skills && path.required_skills.length > 0 && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-2">
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground">
                             Required Skills:
                           </p>
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-wrap gap-2">
                             {path.required_skills.map((skill, skillIdx) => (
                               <Badge
                                 key={skillIdx}
@@ -108,16 +108,16 @@ export default function CareerPathTimeline({
 
         {/* Next Steps */}
         {data.next_steps && data.next_steps.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold mb-3">Next Steps</h3>
-            <ul className="space-y-2">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Next Steps</h3>
+            <ul className="space-y-3">
               {data.next_steps.map((step, idx) => (
                 <li
                   key={idx}
-                  className="flex items-start gap-2 text-sm"
+                  className="flex items-start gap-3 text-sm"
                 >
                   <ArrowRight className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                  <span>{step}</span>
+                  <span className="leading-relaxed">{step}</span>
                 </li>
               ))}
             </ul>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FadeIn } from "@/components/animations/fade-in";
 import ChatWidget from "@/components/analysis/ChatWidget";
 
 export default function ChatPage() {
@@ -15,11 +14,8 @@ export default function ChatPage() {
   }, []);
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <FadeIn>
-        <ChatWidget userId={userId} />
-      </FadeIn>
+    <div className="space-y-6">
+      <ChatWidget userId={userId} />
     </div>
   );
 }
-

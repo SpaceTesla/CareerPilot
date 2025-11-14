@@ -99,7 +99,7 @@ export default function ChatWidget({ userId }: ChatWidgetProps) {
 
   return (
     <Card className="flex flex-col h-[600px]">
-      <CardHeader className="border-b">
+      <CardHeader className="border-b pb-4">
         <CardTitle className="flex items-center gap-2">
           <MessageCircle className="h-5 w-5" />
           Chat Assistant
@@ -143,13 +143,13 @@ export default function ChatWidget({ userId }: ChatWidgetProps) {
                   }`}
                 >
                   <div
-                    className={`rounded-lg px-4 py-2 ${
+                    className={`rounded-lg px-4 py-3 ${
                       message.isUser
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted"
                     }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap">
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
                       {message.content}
                     </p>
                   </div>
