@@ -19,6 +19,7 @@ from app.api.v1.resume import router as resume_router
 from app.core.config import settings
 from app.core.logging import get_logger, setup_logging
 from app.infrastructure.database.connection import engine
+from app.infrastructure.database.init_db import init_db
 
 # Configure logging
 setup_logging(level="INFO", include_file_handler=True, log_file="logs/app.log")
@@ -35,6 +36,13 @@ async def lifespan(app: FastAPI):
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         logger.info("Database connection OK")
+        
+        # Initialize database tables (creates missing tables)
+        try:
+            init_db()
+            logger.info("Database tables initialized")
+        except Exception as e:
+            logger.warning(f"Database initialization warning: {e}")
     except Exception as e:
         logger.error(f"Database connection failed: {e}")
         raise
@@ -46,9 +54,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
 
+# Configure CORS
+cors_origins = settings.cors_origins.split(",") if settings.cors_origins != "*" else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

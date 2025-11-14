@@ -15,7 +15,7 @@ interface ResumeComparisonProps {
 }
 
 export default function ResumeComparison({ userId }: ResumeComparisonProps) {
-  const { data: history, isLoading } = useQuery({
+  const { data: history, isLoading, error } = useQuery({
     queryKey: ["progress", "history", userId],
     queryFn: () => apiRequest(`/progress/history?user_id=${userId}&limit=10`),
     enabled: !!userId,
@@ -29,6 +29,18 @@ export default function ResumeComparison({ userId }: ResumeComparisonProps) {
         </CardHeader>
         <CardContent>
           <Skeleton className="h-64" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-sm text-destructive text-center py-8">
+            Failed to load comparison data
+          </p>
         </CardContent>
       </Card>
     );

@@ -23,16 +23,22 @@ async def get_progress_history(
     """Get analysis history for progress tracking."""
     try:
         with get_session() as session:
-            # Check if table exists
+            # Check if table exists, if not try to create it
             from sqlalchemy import inspect
             inspector = inspect(session.bind)
             if "analysis_history" not in inspector.get_table_names():
-                # Table doesn't exist yet, return empty history
-                return {
-                    "user_id": user_id,
-                    "history": [],
-                    "total_records": 0,
-                }
+                # Try to create the table
+                try:
+                    from app.infrastructure.database.models import AnalysisHistory
+                    from app.infrastructure.database.connection import Base
+                    Base.metadata.create_all(bind=session.bind, tables=[AnalysisHistory.__table__])
+                except Exception:
+                    # If creation fails, return empty history
+                    return {
+                        "user_id": user_id,
+                        "history": [],
+                        "total_records": 0,
+                    }
             
             repo = AnalysisHistoryRepository(session)
             history = repo.get_by_user(user_id)
@@ -121,20 +127,26 @@ async def get_score_trends(
     """Get score trends over time for visualization."""
     try:
         with get_session() as session:
-            # Check if table exists
+            # Check if table exists, if not try to create it
             from sqlalchemy import inspect
             inspector = inspect(session.bind)
             if "analysis_history" not in inspector.get_table_names():
-                # Table doesn't exist yet, return empty trends
-                return {
-                    "user_id": user_id,
-                    "trends": {
-                        "overall_scores": [],
-                        "dates": [],
-                        "grades": [],
-                    },
-                    "total_points": 0,
-                }
+                # Try to create the table
+                try:
+                    from app.infrastructure.database.models import AnalysisHistory
+                    from app.infrastructure.database.connection import Base
+                    Base.metadata.create_all(bind=session.bind, tables=[AnalysisHistory.__table__])
+                except Exception:
+                    # If creation fails, return empty trends
+                    return {
+                        "user_id": user_id,
+                        "trends": {
+                            "overall_scores": [],
+                            "dates": [],
+                            "grades": [],
+                        },
+                        "total_points": 0,
+                    }
             
             repo = AnalysisHistoryRepository(session)
             history = repo.get_by_user(user_id)
