@@ -69,24 +69,36 @@ export default function CourseRecommendations({
         {courses.length > 0 ? (
           <div className="space-y-4">
             {courses.map((course, idx) => (
-              <Card key={idx} className="hover:shadow-md transition-shadow">
+              <Card
+                key={idx}
+                className="hover:shadow-md transition-all duration-200 border-l-4 border-l-primary"
+              >
                 <CardContent className="pt-6">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="font-semibold mb-1">{course.title}</h3>
+                    <div className="flex-1 space-y-2">
+                      <div className="space-y-1">
+                        <h3 className="font-semibold text-lg leading-tight">
+                          {course.title}
+                        </h3>
+                        {course.provider && (
+                          <Badge variant="outline" className="text-xs">
+                            {course.provider}
+                          </Badge>
+                        )}
+                      </div>
                       {course.description && (
-                        <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                        <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
                           {course.description}
                         </p>
                       )}
-                      {course.provider && (
-                        <Badge variant="outline" className="text-xs">
-                          {course.provider}
-                        </Badge>
-                      )}
                     </div>
                     {course.url && (
-                      <Button variant="outline" size="sm" asChild>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="shrink-0"
+                        asChild
+                      >
                         <a
                           href={course.url}
                           target="_blank"
@@ -103,8 +115,10 @@ export default function CourseRecommendations({
             ))}
           </div>
         ) : (
-          <div className="text-center py-8">
-            <BookOpen className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
+          <div className="text-center py-12">
+            <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+              <BookOpen className="h-8 w-8 text-muted-foreground" />
+            </div>
             <p className="text-sm text-muted-foreground">
               No course recommendations available. Try asking the chat agent for
               course suggestions.

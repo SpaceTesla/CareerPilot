@@ -166,7 +166,7 @@ export default function InterviewPractice({ userId }: InterviewPracticeProps) {
       {/* Progress Overview */}
       <Card>
         <CardContent className="pt-6">
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Practice Progress</span>
               <span className="font-medium">
@@ -223,8 +223,8 @@ export default function InterviewPractice({ userId }: InterviewPracticeProps) {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Current Question */}
-          <div>
-            <Label className="text-lg font-semibold mb-3 block">
+          <div className="space-y-4">
+            <Label className="text-lg font-semibold block leading-relaxed">
               {currentQuestion?.text}
             </Label>
             
@@ -273,7 +273,7 @@ export default function InterviewPractice({ userId }: InterviewPracticeProps) {
               onChange={(e) =>
                 setAnswers({ ...answers, [currentQuestionIndex]: e.target.value })
               }
-              className="min-h-40 mt-2"
+              className="min-h-40"
             />
           </div>
 
@@ -313,8 +313,8 @@ export default function InterviewPractice({ userId }: InterviewPracticeProps) {
               {currentEvaluation.feedback?.scores && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {Object.entries(currentEvaluation.feedback.scores).map(([key, value]) => (
-                    <div key={key} className="text-center p-3 bg-muted rounded-lg">
-                      <div className="text-2xl font-bold text-primary">{value}</div>
+                    <div key={key} className="text-center p-4 bg-muted rounded-lg border">
+                      <div className="text-2xl font-bold text-primary mb-1">{value}</div>
                       <div className="text-xs text-muted-foreground capitalize">{key}</div>
                     </div>
                   ))}
@@ -379,12 +379,12 @@ export default function InterviewPractice({ userId }: InterviewPracticeProps) {
           )}
 
           {/* Tips */}
-          <div className="bg-muted p-4 rounded-lg">
-            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+          <div className="bg-muted p-4 rounded-lg border">
+            <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
               Tips for Answering
             </h4>
-            <ul className="text-sm text-muted-foreground space-y-1">
+            <ul className="text-sm text-muted-foreground space-y-2">
               {currentQuestion?.type === "behavioral" ? (
                 <>
                   <li>• Use the STAR method (Situation, Task, Action, Result)</li>

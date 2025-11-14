@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -60,7 +61,7 @@ export default function SkillsGapChart({ userId }: SkillsGapChartProps) {
       <CardContent className="space-y-6">
         {/* Role Selection */}
         <div>
-          <label className="block text-sm font-medium mb-2">Target Role</label>
+          <Label className="mb-2">Target Role</Label>
           <div className="flex flex-wrap gap-2 mb-4">
             {commonRoles.map((role) => (
               <Button

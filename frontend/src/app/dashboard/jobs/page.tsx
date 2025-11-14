@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FadeIn } from "@/components/animations/fade-in";
 import JobMatchCard from "@/components/analysis/JobMatchCard";
 
 export default function JobsPage() {
@@ -16,10 +15,7 @@ export default function JobsPage() {
 
   return (
     <div className="space-y-6">
-      <FadeIn>
-        <JobMatchCard userId={userId} />
-      </FadeIn>
+      <JobMatchCard userId={userId} />
     </div>
   );
 }
-

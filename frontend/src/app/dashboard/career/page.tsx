@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FadeIn } from "@/components/animations/fade-in";
 import CareerPathTimeline from "@/components/analysis/CareerPathTimeline";
 import CourseRecommendations from "@/components/analysis/CourseRecommendations";
 
@@ -17,13 +16,8 @@ export default function CareerPage() {
 
   return (
     <div className="space-y-6">
-      <FadeIn>
-        <CareerPathTimeline userId={userId} />
-      </FadeIn>
-      <FadeIn delay={0.1}>
-        <CourseRecommendations userId={userId} />
-      </FadeIn>
+      <CareerPathTimeline userId={userId} />
+      <CourseRecommendations userId={userId} />
     </div>
   );
 }
-

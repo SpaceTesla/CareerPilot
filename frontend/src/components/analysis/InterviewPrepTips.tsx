@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClipboardList } from "lucide-react";
@@ -52,9 +53,9 @@ export default function InterviewPrepTips({
       <CardContent className="space-y-6">
         {/* Target Role Input */}
         <div>
-          <label className="block text-sm font-medium mb-2">
+          <Label className="mb-2">
             Target Role (optional)
-          </label>
+          </Label>
           <Input
             type="text"
             value={targetRole}
