@@ -8,6 +8,9 @@ from sqlalchemy.orm import Session
 
 from ...infrastructure.database.connection import get_session
 from ...infrastructure.database.models import ResumeProfile
+from ...infrastructure.database.repositories.conversation_repository import (
+    ConversationRepository,
+)
 from ...infrastructure.database.repositories.resume_repository import (
     ResumeRepository,
 )
@@ -59,11 +62,13 @@ async def upload_and_process_resume(
         # Persist to Postgres
         with get_session() as session:  # type: Session
             user_id, profile_id = _persist_resume_json(session, data)
+            session_id = _ensure_session(session, user_id)
 
         # Return identifiers along with processed resume
         return {
             "user_id": user_id,
             "profile_id": profile_id,
+            "session_id": session_id,
             "data": data,
         }
 
@@ -101,3 +106,10 @@ def _persist_resume_json(session: Session, data: dict[str, Any]) -> tuple[str, s
     )
     resume_repo.create_profile(profile)
     return user.id, profile.id
+
+
+def _ensure_session(session: Session, user_id: str) -> str:
+    """Create a new conversation session for the user and return its ID."""
+    conv_repo = ConversationRepository(session)
+    conversation = conv_repo.create_conversation(user_id=user_id)
+    return conversation.id

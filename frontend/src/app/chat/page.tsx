@@ -19,6 +19,7 @@ export default function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [needsResume, setNeedsResume] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -32,32 +33,40 @@ export default function ChatPage() {
 
   // Initialize user_id from localStorage and a session_id
   useEffect(() => {
+    let hasIdentity = false;
     try {
       const storedUserId = localStorage.getItem("cp_user_id");
-      if (storedUserId) setUserId(storedUserId);
+      if (storedUserId) {
+        setUserId(storedUserId);
+        hasIdentity = true;
+      }
     } catch (_) {
       // ignore
     }
-    // generate or reuse a session id per tab
+
     try {
-      const existing = sessionStorage.getItem("cp_session_id");
-      if (existing) {
-        setSessionId(existing);
-      } else {
-        const newId = crypto.randomUUID
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random()}`;
-        sessionStorage.setItem("cp_session_id", newId);
-        setSessionId(newId);
+      const storedSession =
+        localStorage.getItem("cp_session_id") ??
+        sessionStorage.getItem("cp_session_id");
+      if (storedSession) {
+        setSessionId(storedSession);
+        hasIdentity = true;
       }
     } catch (_) {
-      setSessionId(`${Date.now()}-${Math.random()}`);
+      // ignore
     }
+
+    setNeedsResume(!hasIdentity);
   }, []);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputMessage.trim() || isLoading) return;
+    if (!userId && !sessionId) {
+      setError("Upload a resume first so I know which profile to use.");
+      setNeedsResume(true);
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -138,6 +147,22 @@ export default function ChatPage() {
           </button>
         </div>
       </div>
+
+      {needsResume && (
+        <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-3">
+          <div className="max-w-4xl mx-auto text-sm text-yellow-800 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <span>
+              Upload a resume so I can personalize answers with your profile.
+            </span>
+            <button
+              onClick={handleBackToUpload}
+              className="text-yellow-900 font-medium underline underline-offset-2"
+            >
+              Upload now
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
@@ -255,11 +280,11 @@ export default function ChatPage() {
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder="Ask me anything about your career..."
               className="flex-1 border text-black border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={isLoading}
+              disabled={isLoading || (!userId && !sessionId)}
             />
             <button
               type="submit"
-              disabled={!inputMessage.trim() || isLoading}
+              disabled={!inputMessage.trim() || isLoading || (!userId && !sessionId)}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
               {isLoading ? "Sending..." : "Send"}

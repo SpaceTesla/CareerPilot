@@ -12,6 +12,9 @@ class ConversationRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
+    def get_by_id(self, conversation_id: str) -> Conversation | None:
+        return self.session.get(Conversation, conversation_id)
+
     def create_conversation(
         self, user_id: str, title: str | None = None
     ) -> Conversation:
