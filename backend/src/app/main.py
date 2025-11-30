@@ -16,6 +16,7 @@ from app.api.v1.interview import router as interview_router
 from app.api.v1.jobs import router as jobs_router
 from app.api.v1.progress import router as progress_router
 from app.api.v1.resume import router as resume_router
+from app.api.v1.sessions import router as sessions_router
 from app.core.config import settings
 from app.core.logging import get_logger, setup_logging
 from app.infrastructure.database.connection import engine
@@ -73,6 +74,7 @@ app.include_router(jobs_router)
 app.include_router(interview_router)
 app.include_router(progress_router)
 app.include_router(courses_router)
+app.include_router(sessions_router)
 
 # Create static directory if it doesn't exist
 static_dir = "static"

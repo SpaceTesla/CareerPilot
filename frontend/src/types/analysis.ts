@@ -48,6 +48,10 @@ export interface ATSScore {
   ats_score: number;
   keyword_suggestions: string[];
   optimization_tips: string[];
+  semantic_analysis?: string;
+  format_score?: number;
+  content_score?: number;
+  keyword_density?: number;
 }
 
 export interface SkillsGap {

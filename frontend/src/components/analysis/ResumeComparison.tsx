@@ -10,14 +10,30 @@ import { apiRequest } from "@/lib/api";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+interface SectionScore {
+  score: number;
+  [key: string]: unknown;
+}
+
+interface HistoryEntry {
+  overall_score: number;
+  grade: string;
+  section_scores?: Record<string, SectionScore>;
+  [key: string]: unknown;
+}
+
+interface HistoryResponse {
+  history: HistoryEntry[];
+}
+
 interface ResumeComparisonProps {
   userId: string | null;
 }
 
 export default function ResumeComparison({ userId }: ResumeComparisonProps) {
-  const { data: history, isLoading, error } = useQuery({
+  const { data: history, isLoading, error } = useQuery<HistoryResponse>({
     queryKey: ["progress", "history", userId],
-    queryFn: () => apiRequest(`/progress/history?user_id=${userId}&limit=10`),
+    queryFn: () => apiRequest<HistoryResponse>(`/progress/history?user_id=${userId}&limit=10`),
     enabled: !!userId,
   });
 
@@ -123,8 +139,8 @@ export default function ResumeComparison({ userId }: ResumeComparisonProps) {
             <h3 className="text-lg font-semibold mb-4">Section-by-Section Comparison</h3>
             <div className="space-y-3">
               {Object.keys(latest.section_scores).map((section) => {
-                const latestScore = latest.section_scores[section]?.score || 0;
-                const previousScore = previous.section_scores[section]?.score || 0;
+                const latestScore = latest.section_scores![section]?.score || 0;
+                const previousScore = previous.section_scores![section]?.score || 0;
                 const diff = latestScore - previousScore;
 
                 return (
