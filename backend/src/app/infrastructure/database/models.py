@@ -89,3 +89,18 @@ class AnalysisHistory(Base):
     section_scores_json: Mapped[dict[str, Any]] = mapped_column(JSON)
     analysis_data_json: Mapped[dict[str, Any]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc)
+
+
+class UserSession(Base):
+    """Tracks user sessions with their active resume profile."""
+    __tablename__ = "user_sessions"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(UUID(as_uuid=False), ForeignKey("users.id"))
+    profile_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("resume_profiles.id")
+    )
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)  # Session name (e.g., resume filename)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc)
+    last_accessed_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc)

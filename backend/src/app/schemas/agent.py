@@ -10,6 +10,7 @@ class AgentChatRequest(BaseModel):
     message: str
     user_id: str | None = None
     session_id: str | None = None
+    conversation_id: str | None = None  # For persisting chat history
     include_sources: bool = True
     context: dict[str, Any] = Field(default_factory=dict)
 
@@ -24,3 +25,4 @@ class AgentChatResponse(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     success: bool = True
     error_details: str | None = None
+    conversation_id: str | None = None  # Return conversation ID for frontend tracking

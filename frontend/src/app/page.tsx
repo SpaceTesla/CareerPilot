@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
   CardContent,
@@ -15,13 +15,69 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileText, AlertCircle, CheckCircle2 } from "lucide-react";
-import { apiFormRequest } from "@/lib/api";
+import { apiFormRequest, apiRequest } from "@/lib/api";
+import { clearCache, setCachedData } from "@/lib/query-persister";
 import { toast } from "sonner";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const router = useRouter();
+  const queryClient = useQueryClient();
+
+  // Prefetch and persist recommendations data for smoother UX
+  const prefetchRecommendations = async (userId: string) => {
+    // Clear old cache for fresh data on new resume upload
+    clearCache();
+    
+    // Helper to fetch, cache in React Query, and persist to localStorage
+    const fetchAndPersist = async <T,>(queryKey: unknown[], endpoint: string) => {
+      try {
+        const data = await apiRequest<T>(endpoint);
+        // Cache in React Query
+        queryClient.setQueryData(queryKey, data);
+        // Persist to localStorage
+        setCachedData(queryKey, data);
+        return data;
+      } catch {
+        // Silently fail - prefetch is optional
+        return null;
+      }
+    };
+
+    // Prefetch in parallel - these will be cached for when user visits those pages
+    const prefetchPromises = [
+      fetchAndPersist(
+        ["analysis", "overview", userId],
+        `/analysis/overview?user_id=${userId}`
+      ),
+      fetchAndPersist(
+        ["jobs", "recommendations", userId, 10],
+        `/jobs/recommendations?user_id=${userId}&limit=10`
+      ),
+      fetchAndPersist(
+        ["analysis", "career-path", userId],
+        `/analysis/career-path?user_id=${userId}`
+      ),
+      fetchAndPersist(
+        ["analysis", "ats-score", userId],
+        `/analysis/ats-score?user_id=${userId}`
+      ),
+      fetchAndPersist(
+        ["interview", "prep", userId, undefined],
+        `/interview/prep?user_id=${userId}`
+      ),
+      fetchAndPersist(
+        ["interview", "questions", "category", userId, undefined],
+        `/interview/questions-by-category?user_id=${userId}`
+      ),
+    ];
+
+    // Run in background
+    Promise.allSettled(prefetchPromises).catch(() => {
+      // Silently fail - these are just prefetches for UX improvement
+    });
+  };
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -31,6 +87,7 @@ export default function Home() {
         user_id: string;
         profile_id: string;
         session_id: string;
+        resume_session_id: string;
         data: unknown;
       }>(`/resume/upload?enrich=true`, formData);
     },
@@ -46,11 +103,19 @@ export default function Home() {
         if (data.profile_id) {
           localStorage.setItem("cp_profile_id", String(data.profile_id));
         }
+        if (data.resume_session_id) {
+          localStorage.setItem("cp_resume_session_id", String(data.resume_session_id));
+        }
       } catch (_) {
         // no-op if storage fails
       }
 
       toast.success("Resume uploaded successfully!");
+
+      // Start prefetching recommendations in background for smoother UX
+      if (data.user_id) {
+        prefetchRecommendations(data.user_id);
+      }
 
       // Redirect to dashboard overview
       router.push("/dashboard/overview");

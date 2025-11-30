@@ -42,8 +42,8 @@ services:
     working_dir: /app
     command:
       [
-        "uv",
-        "run",
+        "python",
+        "-m",
         "uvicorn",
         "app.main:app",
         "--app-dir",
@@ -76,7 +76,7 @@ services:
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/careerpilot
       PGVECTOR_ENABLED: "true"
     command:
-      ["uv", "run", "python", "-m", "app.infrastructure.database.init_db"]
+      ["python", "-m", "app.infrastructure.database.init_db"]
 
 volumes:
   postgres_data:

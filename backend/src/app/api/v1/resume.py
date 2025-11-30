@@ -15,6 +15,9 @@ from ...infrastructure.database.repositories.conversation_repository import (
 from ...infrastructure.database.repositories.resume_repository import (
     ResumeRepository,
 )
+from ...infrastructure.database.repositories.session_repository import (
+    SessionRepository,
+)
 from ...infrastructure.database.repositories.user_repository import UserRepository
 from ...services.resume_processing.resume_service import ResumeService
 
@@ -64,12 +67,17 @@ async def upload_and_process_resume(
         with get_session() as session:  # type: Session
             user_id, profile_id = _persist_resume_json(session, data)
             session_id = _ensure_session(session, user_id)
+            # Create a resume session for session management
+            resume_session_id = _create_resume_session(
+                session, user_id, profile_id, file.filename
+            )
 
         # Return identifiers along with processed resume
         return {
             "user_id": user_id,
             "profile_id": profile_id,
             "session_id": session_id,
+            "resume_session_id": resume_session_id,
             "data": data,
         }
 
@@ -114,6 +122,17 @@ def _ensure_session(session: Session, user_id: str) -> str:
     conv_repo = ConversationRepository(session)
     conversation = conv_repo.create_conversation(user_id=user_id)
     return conversation.id
+
+
+def _create_resume_session(
+    session: Session, user_id: str, profile_id: str, filename: str | None
+) -> str:
+    """Create a resume session for session management."""
+    session_repo = SessionRepository(session)
+    # Use filename without extension as session name, fallback to profile name
+    name = filename.rsplit(".", 1)[0] if filename else None
+    resume_session = session_repo.create_session(user_id, profile_id, name)
+    return resume_session.id
 
 
 @router.get("/user/{user_id}")

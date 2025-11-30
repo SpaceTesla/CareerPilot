@@ -30,6 +30,12 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
 
+interface UserProfile {
+  name?: string;
+  email?: string;
+  [key: string]: unknown;
+}
+
 const navMain = [
   {
     title: "Overview",
@@ -101,15 +107,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     : null;
 
   // Fetch user profile for name and avatar
-  const { data: profile } = useQuery({
+  const { data: profile } = useQuery<UserProfile | null>({
     queryKey: ["resume", "profile", userId],
     queryFn: () => {
       if (!userId) return null;
       const profileId = localStorage.getItem("cp_profile_id");
       if (profileId) {
-        return apiRequest(`/resume/${profileId}`);
+        return apiRequest<UserProfile>(`/resume/${profileId}`);
       }
-      return apiRequest(`/resume/user/${userId}`);
+      return apiRequest<UserProfile>(`/resume/user/${userId}`);
     },
     enabled: !!userId,
   });

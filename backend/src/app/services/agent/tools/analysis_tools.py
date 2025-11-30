@@ -300,3 +300,94 @@ async def get_resume_metrics_tool(user_id: str | None) -> dict[str, Any]:
         )
 
         return metrics
+
+
+async def analyze_resume_strengths_for_profile_tool(profile_id: str | None) -> dict[str, Any]:
+    """Analyze resume strengths for a specific profile ID."""
+    if not profile_id:
+        return {"error": "Profile ID is required to analyze resume."}
+
+    with get_session() as session:
+        repo = ResumeRepository(session)
+        profile = repo.get_by_id(profile_id)
+        if not profile:
+            return {"error": "No resume profile found."}
+
+        raw_data = getattr(profile, "raw_data", {}) or {}
+
+        # Analyze different sections
+        analysis = {
+            "overall_score": 0,
+            "strengths": [],
+            "areas_for_improvement": [],
+        }
+
+        # Contact Information Analysis
+        contact_info = {
+            "email": getattr(profile, "email", None),
+            "phone": getattr(profile, "phone", None),
+            "location": getattr(profile, "location", None),
+        }
+        contact_count = sum(1 for v in contact_info.values() if v)
+        contact_score = contact_count / 3
+
+        # Skills Analysis
+        skills = raw_data.get("skills", {})
+        total_skills = (
+            len(skills.get("languages", []))
+            + len(skills.get("frameworks", []))
+            + len(skills.get("tools", []))
+        )
+        skills_score = min(total_skills / 5, 1) if total_skills > 0 else 0.1
+
+        # Experience Analysis
+        experience = raw_data.get("experience", [])
+        exp_score = min(len(experience) / 2, 1) if len(experience) > 0 else 0.1
+
+        # Projects Analysis
+        projects = raw_data.get("projects", [])
+        proj_score = min(len(projects) / 1, 1) if len(projects) > 0 else 0.1
+
+        # Education Analysis
+        education = raw_data.get("education", [])
+        edu_score = min(len(education) / 1, 1) if len(education) > 0 else 0.1
+
+        # Summary Analysis
+        summary = getattr(profile, "summary", None) or raw_data.get("summary", "")
+        has_summary = bool(summary and len(summary.strip()) > 20)
+        summary_score = 1.0 if has_summary else 0
+
+        # Calculate overall score with weighted average
+        analysis["overall_score"] = (
+            contact_score * 0.15 +
+            skills_score * 0.25 +
+            exp_score * 0.30 +
+            proj_score * 0.15 +
+            edu_score * 0.10 +
+            summary_score * 0.05
+        )
+        
+        # Ensure minimum score
+        if any([contact_count > 0, total_skills > 0, len(experience) > 0, len(projects) > 0, len(education) > 0]):
+            analysis["overall_score"] = max(analysis["overall_score"], 0.15)
+
+        # Generate strengths and improvements
+        if contact_count >= 2:
+            analysis["strengths"].append("Complete contact information")
+        if total_skills >= 5:
+            analysis["strengths"].append("Strong technical skills profile")
+        if len(experience) >= 2:
+            analysis["strengths"].append("Relevant work experience")
+        if len(projects) >= 1:
+            analysis["strengths"].append("Project portfolio demonstrates skills")
+
+        if contact_count < 2:
+            analysis["areas_for_improvement"].append("Add missing contact information")
+        if total_skills < 5:
+            analysis["areas_for_improvement"].append("Expand technical skills section")
+        if len(experience) < 2:
+            analysis["areas_for_improvement"].append("Consider adding more experience or internships")
+        if not raw_data.get("summary"):
+            analysis["areas_for_improvement"].append("Add a professional summary")
+
+        return analysis

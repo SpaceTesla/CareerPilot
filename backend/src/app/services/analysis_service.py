@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from app.services.agent.tools.analysis_tools import (
@@ -19,9 +20,12 @@ class AnalysisService:
         if not user_id:
             return {"error": "User ID is required"}
 
-        strengths_analysis = await analyze_resume_strengths_tool(user_id)
-        improvements = await suggest_improvements_tool(user_id)
-        metrics = await get_resume_metrics_tool(user_id)
+        # Run all analysis tools in parallel for faster response
+        strengths_analysis, improvements, metrics = await asyncio.gather(
+            analyze_resume_strengths_tool(user_id),
+            suggest_improvements_tool(user_id),
+            get_resume_metrics_tool(user_id),
+        )
 
         if "error" in strengths_analysis:
             return strengths_analysis
@@ -46,6 +50,53 @@ class AnalysisService:
             "improvements": improvements,
             "metrics": metrics,
         }
+
+    async def get_overview_for_profile(self, profile_id: str | None) -> dict[str, Any]:
+        """Get analysis overview for a specific profile ID."""
+        if not profile_id:
+            return {"error": "Profile ID is required"}
+
+        from app.infrastructure.database.connection import get_session
+        from app.infrastructure.database.repositories.resume_repository import ResumeRepository
+
+        # Get profile to find the user_id
+        with get_session() as session:
+            repo = ResumeRepository(session)
+            profile = repo.get_by_id(profile_id)
+            if not profile:
+                return {"error": "Profile not found"}
+            user_id = profile.user_id
+
+        # Use the regular overview method with the user_id
+        # Note: This assumes the tools will work with this user_id
+        # For a more accurate per-profile analysis, tools would need to be updated
+        # to accept profile_id directly. For now, we'll use a simplified approach.
+        
+        from app.services.agent.tools.analysis_tools import (
+            analyze_resume_strengths_for_profile_tool,
+        )
+
+        try:
+            strengths_analysis = await analyze_resume_strengths_for_profile_tool(profile_id)
+            if "error" in strengths_analysis:
+                return strengths_analysis
+
+            raw_score = strengths_analysis.get("overall_score", 0)
+            if raw_score > 1:
+                overall_score = min(raw_score, 100)
+            else:
+                overall_score = min(raw_score * 100, 100)
+            
+            grade = self._calculate_grade(overall_score)
+
+            return {
+                "overall_score": round(overall_score, 1),
+                "grade": grade,
+                "strengths": strengths_analysis.get("strengths", []),
+                "weaknesses": strengths_analysis.get("areas_for_improvement", []),
+            }
+        except Exception as e:
+            return {"error": f"Analysis failed: {str(e)}"}
 
     def _calculate_grade(self, score: float) -> str:
         """Calculate letter grade from score (0-100)."""
@@ -181,9 +232,24 @@ class AnalysisService:
         elif "devops" in role_lower:
             requirements["required"] = ["Docker", "CI/CD", "Linux", "Git"]
             requirements["recommended"] = ["Kubernetes", "AWS", "Terraform", "Jenkins"]
-        elif "data" in role_lower:
-            requirements["required"] = ["Python", "SQL", "Data Analysis"]
-            requirements["recommended"] = ["Pandas", "Machine Learning", "Statistics"]
+        elif "data scientist" in role_lower or "data science" in role_lower:
+            requirements["required"] = ["Python", "SQL", "Statistics", "Machine Learning"]
+            requirements["recommended"] = ["Pandas", "NumPy", "Scikit-learn", "TensorFlow", "Jupyter"]
+        elif "ml engineer" in role_lower or "machine learning" in role_lower:
+            requirements["required"] = ["Python", "Machine Learning", "Deep Learning", "TensorFlow", "PyTorch"]
+            requirements["recommended"] = ["MLOps", "Docker", "Kubernetes", "AWS", "Data Pipelines", "Model Deployment", "Hugging Face", "LangChain"]
+        elif "ai engineer" in role_lower or "artificial intelligence" in role_lower:
+            requirements["required"] = ["Python", "Machine Learning", "Deep Learning", "NLP", "Computer Vision"]
+            requirements["recommended"] = ["TensorFlow", "PyTorch", "LLM", "RAG", "Vector Databases", "LangChain", "Transformers"]
+        elif "data engineer" in role_lower:
+            requirements["required"] = ["Python", "SQL", "ETL", "Data Pipelines"]
+            requirements["recommended"] = ["Apache Spark", "Airflow", "Kafka", "AWS", "Snowflake", "dbt"]
+        elif "cloud" in role_lower or "aws" in role_lower or "azure" in role_lower:
+            requirements["required"] = ["Cloud Platforms", "Linux", "Networking", "Security"]
+            requirements["recommended"] = ["AWS", "Azure", "GCP", "Terraform", "Kubernetes", "CI/CD"]
+        elif "mobile" in role_lower or "ios" in role_lower or "android" in role_lower:
+            requirements["required"] = ["Mobile Development", "UI/UX", "API Integration"]
+            requirements["recommended"] = ["React Native", "Flutter", "Swift", "Kotlin", "Firebase"]
         else:
             # General requirements
             requirements["required"] = ["Programming", "Problem Solving"]
