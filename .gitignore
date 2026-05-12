@@ -60,6 +60,12 @@ coverage/
 .cache/
 .parcel-cache/
 
+# Tooling / local captures (not source)
+.playwright-mcp/
+
+# Portal session exports (secrets) — import via API, do not commit
+backend/seeds/*.json
+
 # Runtime data
 pids/
 *.pid
