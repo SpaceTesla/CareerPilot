@@ -142,16 +142,23 @@ Format as a structured list with actionable advice."""),
         context_str = ". ".join(context_parts)
 
         prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are an expert interviewer. Generate relevant interview questions."),
+            ("system", """You are an expert interviewer. Generate relevant interview questions.
+IMPORTANT: Output ONLY the numbered questions. No introduction, no preamble, no explanation.
+Start directly with "1." and list each question on its own line."""),
             ("user", f"""Based on this candidate profile:
 {context_str}
 
-Generate 10 interview questions including:
+Generate exactly 10 interview questions:
 - 3-4 technical questions relevant to their skills
 - 3-4 behavioral questions using STAR method
 - 2-3 questions about their projects/experience
 
-Format each question clearly and indicate the type (Technical/Behavioral/Project)."""),
+Format:
+1. [Technical] Question text here
+2. [Behavioral] Question text here
+...and so on
+
+Start directly with question 1. No introduction or summary."""),
         ])
 
         chain = prompt | self.llm | StrOutputParser()
@@ -318,22 +325,33 @@ Format as JSON with keys: strengths, improvements, suggestions, scores, sample_a
 
         # Adjust prompt based on category
         if category == "technical":
-            question_prompt = "Generate 5-7 technical interview questions relevant to their programming skills and technologies."
+            question_prompt = """Generate exactly 7 technical interview questions relevant to their programming skills and technologies.
+Format each as: [Technical] Question text"""
         elif category == "behavioral":
-            question_prompt = "Generate 5-7 behavioral interview questions that can be answered using the STAR method."
+            question_prompt = """Generate exactly 7 behavioral interview questions that can be answered using the STAR method.
+Format each as: [Behavioral] Question text"""
         elif category == "situational":
-            question_prompt = "Generate 5-7 situational interview questions about problem-solving and decision-making."
+            question_prompt = """Generate exactly 7 situational interview questions about problem-solving and decision-making.
+Format each as: [Situational] Question text"""
         else:
-            question_prompt = "Generate 10 interview questions with a mix of technical, behavioral, and situational questions."
+            question_prompt = """Generate exactly 10 interview questions with a mix of technical, behavioral, and situational questions.
+Format each as: [Type] Question text where Type is Technical, Behavioral, or Situational"""
 
         prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are an expert interviewer. Generate relevant interview questions."),
+            ("system", """You are an expert interviewer. Generate relevant interview questions.
+IMPORTANT: Output ONLY the numbered questions. No introduction, no preamble, no explanation, no summary.
+Start directly with "1." and list each question on its own line."""),
             ("user", f"""Based on this candidate profile:
 {context_str}
 
 {question_prompt}
 
-Format each question clearly and indicate the type (Technical/Behavioral/Situational)."""),
+Output format - start directly with:
+1. [Type] Question text here
+2. [Type] Question text here
+...
+
+Do NOT include any text before "1." or after the last question."""),
         ])
 
         chain = prompt | self.llm | StrOutputParser()

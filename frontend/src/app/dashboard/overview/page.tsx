@@ -11,7 +11,7 @@ import { useAnalysisOverview } from "@/hooks/queries/useAnalysis";
 import MetricCards from "@/components/analysis/MetricCards";
 import ResumeScoreCard from "@/components/analysis/ResumeScoreCard";
 import StrengthsWeaknesses from "@/components/analysis/StrengthsWeaknesses";
-import ATSScoreCard from "@/components/analysis/ATSScoreCard";
+import ATSKeywordHighlight from "@/components/analysis/ATSKeywordHighlight";
 import SkillsBreakdownChart from "@/components/analysis/SkillsBreakdownChart";
 import SectionScoresRadar from "@/components/analysis/SectionScoresRadar";
 import ProgressChart from "@/components/analysis/ProgressChart";
@@ -77,10 +77,10 @@ export default function OverviewPage() {
       {/* Main Resume Score Card */}
       <ResumeScoreCard data={overview || null} />
 
-      {/* Two Column Layout - Strengths/Weaknesses and ATS Score */}
+      {/* Two Column Layout - Strengths/Weaknesses and ATS Keyword Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <StrengthsWeaknesses data={overview || null} />
-        <ATSScoreCard userId={userId} />
+        <ATSKeywordHighlight userId={userId} />
       </div>
 
       {/* Charts Section */}

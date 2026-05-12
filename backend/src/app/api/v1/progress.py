@@ -1,45 +1,39 @@
 """Progress tracking API routes."""
 
+import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.api.dependencies.auth import enforce_user_access, get_authenticated_user_id
 from app.infrastructure.database.connection import get_session
 from app.infrastructure.database.repositories.analysis_history_repository import (
     AnalysisHistoryRepository,
 )
 from app.infrastructure.database.models import AnalysisHistory
 from app.services.analysis_service import analysis_service
-import uuid
 
 router = APIRouter(prefix="/progress", tags=["progress"])
+
+
+def _validate_uuid(value: str, field_name: str) -> None:
+    try:
+        uuid.UUID(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid {field_name}") from exc
 
 
 @router.get("/history")
 async def get_progress_history(
     user_id: str = Query(..., description="User ID"),
     limit: int = Query(10, ge=1, le=50, description="Number of records to return"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """Get analysis history for progress tracking."""
     try:
+        _validate_uuid(user_id, "user_id")
+        enforce_user_access(user_id, auth_user_id)
         with get_session() as session:
-            # Check if table exists, if not try to create it
-            from sqlalchemy import inspect
-            inspector = inspect(session.bind)
-            if "analysis_history" not in inspector.get_table_names():
-                # Try to create the table
-                try:
-                    from app.infrastructure.database.models import AnalysisHistory
-                    from app.infrastructure.database.connection import Base
-                    Base.metadata.create_all(bind=session.bind, tables=[AnalysisHistory.__table__])
-                except Exception:
-                    # If creation fails, return empty history
-                    return {
-                        "user_id": user_id,
-                        "history": [],
-                        "total_records": 0,
-                    }
-            
             repo = AnalysisHistoryRepository(session)
             history = repo.get_by_user(user_id)
 
@@ -60,22 +54,25 @@ async def get_progress_history(
                 "history": history_data,
                 "total_records": len(history),
             }
+    except HTTPException:
+        raise
     except Exception as e:
-        # Return empty history instead of error if table doesn't exist
-        return {
-            "user_id": user_id,
-            "history": [],
-            "total_records": 0,
-        }
+        raise HTTPException(
+            status_code=500, detail=f"Failed to load progress history: {str(e)}"
+        ) from e
 
 
 @router.post("/save")
 async def save_analysis_snapshot(
     user_id: str = Query(..., description="User ID"),
     profile_id: str = Query(..., description="Profile ID"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """Save current analysis as a snapshot for progress tracking."""
     try:
+        _validate_uuid(user_id, "user_id")
+        _validate_uuid(profile_id, "profile_id")
+        enforce_user_access(user_id, auth_user_id)
         # Get current analysis
         overview = await analysis_service.get_overview(user_id)
         if "error" in overview:
@@ -123,31 +120,13 @@ async def save_analysis_snapshot(
 @router.get("/trends")
 async def get_score_trends(
     user_id: str = Query(..., description="User ID"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """Get score trends over time for visualization."""
     try:
+        _validate_uuid(user_id, "user_id")
+        enforce_user_access(user_id, auth_user_id)
         with get_session() as session:
-            # Check if table exists, if not try to create it
-            from sqlalchemy import inspect
-            inspector = inspect(session.bind)
-            if "analysis_history" not in inspector.get_table_names():
-                # Try to create the table
-                try:
-                    from app.infrastructure.database.models import AnalysisHistory
-                    from app.infrastructure.database.connection import Base
-                    Base.metadata.create_all(bind=session.bind, tables=[AnalysisHistory.__table__])
-                except Exception:
-                    # If creation fails, return empty trends
-                    return {
-                        "user_id": user_id,
-                        "trends": {
-                            "overall_scores": [],
-                            "dates": [],
-                            "grades": [],
-                        },
-                        "total_points": 0,
-                    }
-            
             repo = AnalysisHistoryRepository(session)
             history = repo.get_by_user(user_id)
 
@@ -176,15 +155,10 @@ async def get_score_trends(
                 "trends": trends,
                 "total_points": len(trends["overall_scores"]),
             }
+    except HTTPException:
+        raise
     except Exception as e:
-        # Return empty trends instead of error
-        return {
-            "user_id": user_id,
-            "trends": {
-                "overall_scores": [],
-                "dates": [],
-                "grades": [],
-            },
-            "total_points": 0,
-        }
+        raise HTTPException(
+            status_code=500, detail=f"Failed to load score trends: {str(e)}"
+        ) from e
 

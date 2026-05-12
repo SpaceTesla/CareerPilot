@@ -42,20 +42,38 @@ export default function InterviewPractice({ userId }: InterviewPracticeProps) {
   const { data, isLoading } = useInterviewQuestionsByCategory(userId, selectedCategory);
   const evaluateMutation = useEvaluateAnswer();
 
-  // Parse questions from text
+  // Parse questions from text - filter out preamble and non-question text
   const questions = data?.questions
     ? data.questions
         .split(/\d+\./)
-        .filter((q) => q.trim().length > 0)
+        .filter((q) => {
+          const trimmed = q.trim();
+          // Filter out empty entries and preamble text (must contain a question mark or brackets)
+          if (trimmed.length < 10) return false;
+          // Must look like a question (has ? or starts with [Type])
+          const looksLikeQuestion = trimmed.includes("?") || 
+                                    trimmed.match(/^\s*\[(Technical|Behavioral|Situational|Project)\]/i);
+          return looksLikeQuestion;
+        })
         .map((q) => {
           const trimmed = q.trim();
-          // Extract question type if mentioned
-          const typeMatch = trimmed.match(/(Technical|Behavioral|Situational|Project)/i);
-          const type = typeMatch ? typeMatch[1].toLowerCase() : "general";
-          return {
-            text: trimmed.replace(/(Technical|Behavioral|Situational|Project):\s*/i, ""),
-            type,
-          };
+          // Extract question type if mentioned in brackets like [Technical]
+          const bracketTypeMatch = trimmed.match(/^\s*\[(Technical|Behavioral|Situational|Project)\]\s*/i);
+          // Or mentioned inline
+          const inlineTypeMatch = trimmed.match(/(Technical|Behavioral|Situational|Project):\s*/i);
+          
+          let type = "general";
+          let text = trimmed;
+          
+          if (bracketTypeMatch) {
+            type = bracketTypeMatch[1].toLowerCase();
+            text = trimmed.replace(bracketTypeMatch[0], "").trim();
+          } else if (inlineTypeMatch) {
+            type = inlineTypeMatch[1].toLowerCase();
+            text = trimmed.replace(inlineTypeMatch[0], "").trim();
+          }
+          
+          return { text, type };
         })
         .slice(0, 15)
     : [];
@@ -314,7 +332,7 @@ export default function InterviewPractice({ userId }: InterviewPracticeProps) {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {Object.entries(currentEvaluation.feedback.scores).map(([key, value]) => (
                     <div key={key} className="text-center p-4 bg-muted rounded-lg border">
-                      <div className="text-2xl font-bold text-primary mb-1">{value}</div>
+                      <div className="text-2xl font-bold text-primary mb-1">{String(value)}</div>
                       <div className="text-xs text-muted-foreground capitalize">{key}</div>
                     </div>
                   ))}
