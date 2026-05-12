@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,7 +36,6 @@ import {
   type ResumeSession,
 } from "@/hooks/queries/useSessions";
 import { toast } from "sonner";
-import { clearCache } from "@/lib/query-persister";
 
 interface SessionSwitcherProps {
   userId: string | null;
@@ -60,18 +59,12 @@ export default function SessionSwitcher({
     if (session.profile_id === currentProfileId) return;
 
     try {
-      // Clear the cache before switching
-      clearCache();
-
       await switchSession.mutateAsync({
         sessionId: session.session_id,
         userId: session.user_id,
       });
 
       toast.success(`Switched to "${session.name}"`);
-
-      // Reload the page to refresh all data
-      window.location.reload();
     } catch {
       toast.error("Failed to switch session");
     }
@@ -81,7 +74,10 @@ export default function SessionSwitcher({
     if (!sessionToDelete) return;
 
     try {
-      await deleteSession.mutateAsync(sessionToDelete.session_id);
+      await deleteSession.mutateAsync({
+        sessionId: sessionToDelete.session_id,
+        userId: sessionToDelete.user_id,
+      });
       toast.success("Session deleted");
       setDeleteDialogOpen(false);
       setSessionToDelete(null);
@@ -90,7 +86,7 @@ export default function SessionSwitcher({
     }
   };
 
-  const confirmDelete = (session: ResumeSession, e: React.MouseEvent) => {
+  const confirmDelete = (session: ResumeSession, e: MouseEvent) => {
     e.stopPropagation();
     setSessionToDelete(session);
     setDeleteDialogOpen(true);

@@ -1,17 +1,21 @@
+import asyncio
 import os
 import tempfile
+import uuid
 from pathlib import Path as PathLib
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile
 from fastapi.params import Path
 from sqlalchemy.orm import Session
 
+from app.api.dependencies.auth import get_authenticated_user_id
 from ...infrastructure.database.connection import get_session
-from ...infrastructure.database.models import ResumeProfile
+from ...infrastructure.database.models import ResumeProcessingJob, ResumeProfile, User
 from ...infrastructure.database.repositories.conversation_repository import (
     ConversationRepository,
 )
+from ...infrastructure.database.repositories.resume_job_repository import ResumeJobRepository
 from ...infrastructure.database.repositories.resume_repository import (
     ResumeRepository,
 )
@@ -31,6 +35,7 @@ resume_service = ResumeService()
 async def upload_and_process_resume(
     file: UploadFile,
     enrich: bool = True,
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """
     Upload and process a resume file.
@@ -46,31 +51,58 @@ async def upload_and_process_resume(
         Processed resume data as JSON
     """
     temp_file_path = None
+    upload_filename = file.filename or "resume.pdf"
 
     try:
         # Save uploaded file to temporary location
         with tempfile.NamedTemporaryFile(
-            delete=False, suffix=PathLib(file.filename).suffix
+            delete=False, suffix=PathLib(upload_filename).suffix
         ) as temp_file:
             content = await file.read()
             temp_file.write(content)
             temp_file_path = temp_file.name
 
-        # Process the resume using the proper method that handles PDFs and markdown
-        data = resume_service.process_resume(
-            file_path=temp_file_path,
-            enrich=enrich,
-            save_output=False,
+        # Process the resume in a thread-pool so the async event loop is not blocked
+        loop = asyncio.get_event_loop()
+        data = await loop.run_in_executor(
+            None,
+            lambda: resume_service.process_resume(
+                file_path=temp_file_path,
+                enrich=enrich,
+                save_output=False,
+            ),
         )
 
         # Persist to Postgres
         with get_session() as session:  # type: Session
-            user_id, profile_id = _persist_resume_json(session, data)
+            user_id, profile_id = _persist_resume_json(
+                session,
+                data,
+                preferred_user_id=auth_user_id,
+            )
             session_id = _ensure_session(session, user_id)
             # Create a resume session for session management
             resume_session_id = _create_resume_session(
-                session, user_id, profile_id, file.filename
+                session, user_id, profile_id, upload_filename
             )
+
+        # Generate and persist skills embedding asynchronously (best-effort)
+        try:
+            from app.infrastructure.rag.embeddings.service import embedding_service
+            skills = data.get("skills", {})
+            all_skills: list[str] = []
+            if isinstance(skills, dict):
+                all_skills.extend(skills.get("languages", []) or [])
+                all_skills.extend(skills.get("frameworks", []) or [])
+                all_skills.extend(skills.get("tools", []) or [])
+            if all_skills and embedding_service.available:
+                emb = await embedding_service.embed_skills(all_skills)
+                if emb is not None:
+                    with get_session() as session:
+                        repo = ResumeRepository(session)
+                        repo.update_profile(profile_id, {"skills_embedding": emb})
+        except Exception:
+            pass  # Embedding is best-effort; do not fail the upload
 
         # Return identifiers along with processed resume
         return {
@@ -92,15 +124,99 @@ async def upload_and_process_resume(
             os.unlink(temp_file_path)
 
 
-def _persist_resume_json(session: Session, data: dict[str, Any]) -> tuple[str, str]:
+@router.post("/upload/async")
+async def upload_resume_async(
+    background_tasks: BackgroundTasks,
+    file: UploadFile,
+    enrich: bool = True,
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
+) -> dict[str, Any]:
+    """Queue resume processing and return a job ID for polling."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="File name is required")
+
+    temp_file_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            delete=False, suffix=PathLib(file.filename).suffix
+        ) as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+
+        with get_session() as session:
+            job_repo = ResumeJobRepository(session)
+            job = ResumeProcessingJob(
+                id=str(uuid.uuid4()),
+                requested_by_user_id=auth_user_id,
+                status="queued",
+                filename=file.filename,
+                enrich=enrich,
+                progress=5,
+                message="Upload received",
+            )
+            job_repo.create(job)
+            job_id = job.id
+
+        background_tasks.add_task(_process_resume_job, job_id, temp_file_path, enrich, file.filename)
+
+        return {
+            "job_id": job_id,
+            "status": "queued",
+            "progress": 5,
+            "message": "Resume queued for processing",
+        }
+    except Exception as e:
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to queue resume processing: {str(e)}"
+        ) from e
+
+
+@router.get("/jobs/{job_id}")
+async def get_resume_job_status(
+    job_id: str = Path(..., description="Resume processing job ID"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
+) -> dict[str, Any]:
+    """Get current status of a resume processing job."""
+    with get_session() as session:
+        job_repo = ResumeJobRepository(session)
+        job = job_repo.get_by_id(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Resume processing job not found")
+
+        if auth_user_id and job.requested_by_user_id and job.requested_by_user_id != auth_user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        return _serialize_job(job)
+
+
+def _persist_resume_json(
+    session: Session,
+    data: dict[str, Any],
+    preferred_user_id: str | None = None,
+) -> tuple[str, str]:
     """Save resume JSON; return (user_id, profile_id)."""
     user_repo = UserRepository(session)
     resume_repo = ResumeRepository(session)
 
     email = data.get("email") or "unknown@example.com"
-    user = user_repo.get_or_create_by_email(email)
 
-    import uuid
+    if preferred_user_id:
+        user = session.get(User, preferred_user_id)
+        if not user:
+            existing_email_user = user_repo.get_by_email(email)
+            final_email = (
+                email
+                if not existing_email_user or existing_email_user.id == preferred_user_id
+                else f"user-{preferred_user_id}@local.invalid"
+            )
+            user = User(id=preferred_user_id, email=final_email)
+            session.add(user)
+            session.flush()
+    else:
+        user = user_repo.get_or_create_by_email(email)
 
     profile = ResumeProfile(
         id=str(uuid.uuid4()),
@@ -133,6 +249,80 @@ def _create_resume_session(
     name = filename.rsplit(".", 1)[0] if filename else None
     resume_session = session_repo.create_session(user_id, profile_id, name)
     return resume_session.id
+
+
+def _process_resume_job(job_id: str, temp_file_path: str, enrich: bool, filename: str | None) -> None:
+    """Background task that processes a queued resume job."""
+    try:
+        requested_by_user_id: str | None = None
+        with get_session() as session:
+            job_repo = ResumeJobRepository(session)
+            job = job_repo.get_by_id(job_id)
+            if not job:
+                return
+            requested_by_user_id = job.requested_by_user_id
+            job_repo.mark_started(job)
+
+        data = resume_service.process_resume(
+            file_path=temp_file_path,
+            enrich=enrich,
+            save_output=False,
+        )
+
+        with get_session() as session:
+            user_id, profile_id = _persist_resume_json(
+                session,
+                data,
+                preferred_user_id=requested_by_user_id,
+            )
+            session_id = _ensure_session(session, user_id)
+            resume_session_id = _create_resume_session(session, user_id, profile_id, filename)
+
+            job_repo = ResumeJobRepository(session)
+            job = job_repo.get_by_id(job_id)
+            if job:
+                job_repo.mark_completed(
+                    job,
+                    resolved_user_id=user_id,
+                    profile_id=profile_id,
+                    session_id=session_id,
+                    resume_session_id=resume_session_id,
+                )
+    except Exception as e:
+        with get_session() as session:
+            job_repo = ResumeJobRepository(session)
+            job = job_repo.get_by_id(job_id)
+            if job:
+                job_repo.mark_failed(job, str(e))
+    finally:
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+
+
+def _serialize_job(job: ResumeProcessingJob) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "job_id": job.id,
+        "status": job.status,
+        "progress": job.progress,
+        "message": job.message,
+        "error": job.error,
+        "filename": job.filename,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+    }
+
+    if job.status == "completed":
+        payload.update(
+            {
+                "user_id": job.resolved_user_id,
+                "profile_id": job.profile_id,
+                "session_id": job.session_id,
+                "resume_session_id": job.resume_session_id,
+            }
+        )
+
+    return payload
 
 
 @router.get("/user/{user_id}")

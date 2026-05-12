@@ -1,0 +1,64 @@
+# Alex Johnson
+
+**Email:** alex.johnson@example.com  
+**Phone:** +1-555-000-1234  
+**Location:** San Francisco, CA  
+**LinkedIn:** linkedin.com/in/alexjohnson-dev  
+**GitHub:** github.com/alexjohnson-dev
+
+---
+
+## Summary
+
+Backend software engineer with 3 years of experience building REST APIs, microservices, and data pipelines. Focused on Python-based stacks with strong knowledge of cloud deployment.
+
+---
+
+## Skills
+
+**Languages:** Python, SQL, Bash  
+**Frameworks:** FastAPI, Flask, Django  
+**Tools:** Docker, Git, Redis, Celery  
+**Databases:** PostgreSQL, MongoDB  
+**Cloud:** AWS (EC2, S3, Lambda), GCP basics
+
+---
+
+## Experience
+
+**Backend Engineer — Acme Corp** *(Jan 2023 – Present)*  
+- Designed and implemented REST APIs serving 50k daily active users  
+- Reduced database query latency by 40% through indexing and query optimization  
+- Containerised services with Docker and deployed on AWS ECS  
+- Wrote unit and integration tests achieving 85% code coverage
+
+**Junior Developer — StartupXYZ** *(Jun 2021 – Dec 2022)*  
+- Built internal tooling with Flask and PostgreSQL  
+- Automated data ingestion pipelines using Celery and Redis  
+- Collaborated in agile sprint cycles with a 5-person team
+
+---
+
+## Projects
+
+**TaskFlow** — Personal project  
+A task management API built with FastAPI, PostgreSQL, and JWT authentication.  
+Deployed on AWS Lambda with a CI/CD pipeline via GitHub Actions.
+
+**DataPulse** — Open source  
+A lightweight ETL tool for pulling data from REST APIs into PostgreSQL.  
+400+ GitHub stars.
+
+---
+
+## Education
+
+**B.Sc. Computer Science** — State University, 2021  
+GPA: 3.7 / 4.0
+
+---
+
+## Certifications
+
+- AWS Certified Developer – Associate (2023)
+- Docker Certified Associate (2022)

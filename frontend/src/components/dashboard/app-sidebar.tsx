@@ -11,6 +11,7 @@ import {
   Settings,
   HelpCircle,
   ArrowUpCircle,
+  ClipboardList,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -51,6 +52,11 @@ const navMain = [
     title: "Jobs",
     url: "/dashboard/jobs",
     icon: Briefcase,
+  },
+  {
+    title: "Applications",
+    url: "/dashboard/applications",
+    icon: ClipboardList,
   },
   {
     title: "Career",

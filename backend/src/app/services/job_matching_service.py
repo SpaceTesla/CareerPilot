@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
@@ -103,13 +104,44 @@ class JobMatchingService:
             print(f"JSearch API error: {e}")
             return []
 
+    async def _get_indeed_jobs(self, query: str, limit: int = 2) -> list[dict[str, Any]]:
+        """Fetch jobs specifically from Indeed via Tavily include_domains."""
+        try:
+            response = self.tavily_client.search(
+                query=f"{query} easy apply jobs hiring now",
+                search_depth="basic",
+                max_results=limit * 4,
+                include_domains=["indeed.com"],
+            )
+            jobs: list[dict[str, Any]] = []
+            skip_keywords = ["guide", "how to", "salary guide", "what is", "career advice", "resume tips"]
+            for result in response.get("results", []):
+                url = result.get("url", "")
+                title = result.get("title", "")
+                if "indeed.com" not in url.lower():
+                    continue
+                if any(kw in title.lower() for kw in skip_keywords):
+                    continue
+                jobs.append({
+                    "title": title,
+                    "url": url,
+                    "description": result.get("content", "")[:200] + "...",
+                    "source": "Indeed",
+                })
+                if len(jobs) >= limit:
+                    break
+            return jobs
+        except Exception as e:
+            print(f"Indeed targeted search error: {e}")
+            return []
+
     async def _get_jobs_from_tavily_fallback(
         self, query: str, limit: int
     ) -> list[dict[str, Any]]:
         """Fallback to Tavily search (returns general results, not ideal)."""
         try:
             response = self.tavily_client.search(
-                query=f"{query} site:linkedin.com/jobs OR site:indeed.com OR site:naukri.com",
+                query=f"{query} easy apply site:linkedin.com/jobs OR site:indeed.com OR site:naukri.com",
                 search_depth="basic",
                 max_results=limit * 2,  # Get more to filter
             )
@@ -162,6 +194,48 @@ class JobMatchingService:
         else:
             return "Job Board"
 
+    def _apply_feedback_ranking(
+        self, user_id: str, jobs: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """
+        Re-rank job recommendations based on stored user feedback.
+
+        - Jobs with 'helpful' feedback are boosted (moved up, score +10).
+        - Jobs with 'not_helpful' feedback are pushed to the end.
+        """
+        try:
+            from app.infrastructure.database.connection import get_session
+            from app.infrastructure.database.repositories.recommendation_feedback_repository import (
+                RecommendationFeedbackRepository,
+            )
+
+            with get_session() as session:
+                repo = RecommendationFeedbackRepository(session)
+                helpful = repo.get_helpful_identifiers(user_id, "job")
+                not_helpful = repo.get_not_helpful_identifiers(user_id, "job")
+        except Exception:
+            return jobs
+
+        if not helpful and not_helpful:
+            return jobs
+
+        helpful_jobs: list[dict[str, Any]] = []
+        neutral_jobs: list[dict[str, Any]] = []
+        disliked_jobs: list[dict[str, Any]] = []
+
+        for job in jobs:
+            url = job.get("url", "")
+            if url in helpful:
+                job = {**job, "score": (job.get("score") or 0) + 10, "feedback": "helpful"}
+                helpful_jobs.append(job)
+            elif url in not_helpful:
+                job = {**job, "feedback": "not_helpful"}
+                disliked_jobs.append(job)
+            else:
+                neutral_jobs.append(job)
+
+        return helpful_jobs + neutral_jobs + disliked_jobs
+
     async def get_recommendations(self, user_id: str | None, limit: int = 10) -> dict[str, Any]:
         """Get personalized job recommendations."""
         if not user_id:
@@ -195,12 +269,35 @@ class JobMatchingService:
         
         location = profile.get("location")
 
-        # Try JSearch API first (real job postings)
-        jobs = await self._get_jobs_from_jsearch(query, location, limit)
-        
+        # Try JSearch API first (real job postings); run Indeed guarantee in parallel
+        jsearch_task = asyncio.create_task(self._get_jobs_from_jsearch(query, location, limit))
+        indeed_task = asyncio.create_task(self._get_indeed_jobs(query, limit=2))
+
+        jobs, indeed_jobs = await asyncio.gather(jsearch_task, indeed_task)
+
         # Fallback to Tavily if JSearch fails or not configured
         if not jobs:
             jobs = await self._get_jobs_from_tavily_fallback(query, limit)
+
+        # Ensure at least 2 Indeed jobs are present
+        existing_indeed_count = sum(
+            1 for j in jobs if "indeed.com" in (j.get("url") or "").lower()
+        )
+        indeed_needed = max(0, 2 - existing_indeed_count)
+        if indeed_needed > 0 and indeed_jobs:
+            # Deduplicate by URL before inserting
+            existing_urls = {j.get("url") for j in jobs}
+            new_indeed = [
+                j for j in indeed_jobs[: indeed_needed]
+                if j.get("url") not in existing_urls
+            ]
+            # Spread them: 1st Indeed at index 0, 2nd at index 2 (so they're visible)
+            for i, ij in enumerate(new_indeed):
+                insert_pos = min(i * 2, len(jobs))
+                jobs.insert(insert_pos, ij)
+
+        # Apply feedback-based re-ranking
+        jobs = self._apply_feedback_ranking(user_id, jobs)
 
         return {
             "jobs": jobs,

@@ -56,7 +56,7 @@ export default function ChatWidget({ userId }: ChatWidgetProps) {
 
   // Fetch chat history
   const { data: historyData, refetch: refetchHistory } = useChatHistory(userId);
-  const { data: conversationData } = useConversationMessages(activeConversationId);
+  const { data: conversationData } = useConversationMessages(userId, activeConversationId);
   const deleteConversation = useDeleteConversation();
 
   const scrollToBottom = () => {
@@ -93,8 +93,13 @@ export default function ChatWidget({ userId }: ChatWidgetProps) {
   };
 
   const handleDeleteConversation = async (conversationId: string) => {
+    if (!userId) {
+      toast.error("User ID is required");
+      return;
+    }
+
     try {
-      await deleteConversation.mutateAsync(conversationId);
+      await deleteConversation.mutateAsync({ conversationId, userId });
       if (activeConversationId === conversationId) {
         handleNewChat();
       }

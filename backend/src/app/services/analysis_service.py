@@ -174,88 +174,67 @@ class AnalysisService:
         return keywords
 
     async def get_skills_gap(self, user_id: str | None, target_role: str | None = None) -> dict[str, Any]:
-        """Analyze skills gap for target role."""
+        """Analyze skills gap for target role using hybrid exact + semantic scoring."""
         if not user_id:
             return {"error": "User ID is required"}
 
         from app.services.agent.tools.resume_tools import get_skills_tool
+        from app.services.role_embeddings import compute_semantic_gap_score, get_role_requirements
 
         skills_data = await get_skills_tool(user_id)
         if "error" in skills_data:
             return skills_data
 
-        # Define required skills for common roles
-        role_requirements = self._get_role_requirements(target_role)
+        current_skills: list[str] = []
+        current_skills.extend(skills_data.get("languages", []))
+        current_skills.extend(skills_data.get("frameworks", []))
+        current_skills.extend(skills_data.get("tools", []))
 
-        current_skills = set()
-        current_skills.update(skills_data.get("languages", []))
-        current_skills.update(skills_data.get("frameworks", []))
-        current_skills.update(skills_data.get("tools", []))
-
+        role_requirements = get_role_requirements(target_role)
+        current_set = set(current_skills)
         required_skills = set(role_requirements.get("required", []))
         recommended_skills = set(role_requirements.get("recommended", []))
 
-        missing_required = required_skills - current_skills
-        missing_recommended = recommended_skills - current_skills
-        matching_skills = current_skills & (required_skills | recommended_skills)
+        missing_required = required_skills - current_set
+        missing_recommended = recommended_skills - current_set
+        matching_skills = current_set & (required_skills | recommended_skills)
 
-        gap_score = (len(matching_skills) / len(required_skills | recommended_skills) * 100) if (required_skills | recommended_skills) else 0
+        # Retrieve stored skills embedding from the profile (if available)
+        resume_embedding: list[float] | None = None
+        try:
+            from app.infrastructure.database.connection import get_session
+            from app.infrastructure.database.repositories.resume_repository import ResumeRepository
+
+            with get_session() as session:
+                repo = ResumeRepository(session)
+                profiles = repo.get_by_user(user_id)
+                if profiles:
+                    profile = sorted(profiles, key=lambda p: p.updated_at, reverse=True)[0]
+                    stored = getattr(profile, "skills_embedding", None)
+                    if stored is not None and isinstance(stored, list):
+                        resume_embedding = stored
+        except Exception:
+            pass
+
+        # Semantic gap score (falls back to exact if embeddings not available)
+        gap_score = await compute_semantic_gap_score(
+            current_skills, target_role, resume_embedding
+        )
 
         return {
             "target_role": target_role or "General",
-            "current_skills": list(current_skills),
+            "current_skills": list(current_set),
             "missing_required": list(missing_required),
             "missing_recommended": list(missing_recommended),
             "matching_skills": list(matching_skills),
-            "gap_score": round(gap_score, 1),
-            "recommendations": list(missing_required)[:5],  # Top 5 to focus on
+            "gap_score": gap_score,
+            "recommendations": list(missing_required)[:5],
         }
 
     def _get_role_requirements(self, role: str | None) -> dict[str, list[str]]:
-        """Get skill requirements for a specific role."""
-        role_lower = (role or "").lower()
-
-        requirements = {
-            "required": [],
-            "recommended": [],
-        }
-
-        if "backend" in role_lower:
-            requirements["required"] = ["Python", "SQL", "API", "Database"]
-            requirements["recommended"] = ["Django", "Flask", "PostgreSQL", "REST", "Docker"]
-        elif "frontend" in role_lower:
-            requirements["required"] = ["JavaScript", "HTML", "CSS", "React"]
-            requirements["recommended"] = ["TypeScript", "Next.js", "TailwindCSS", "Git"]
-        elif "fullstack" in role_lower or "full-stack" in role_lower:
-            requirements["required"] = ["JavaScript", "Python", "React", "SQL"]
-            requirements["recommended"] = ["Node.js", "TypeScript", "Docker", "AWS"]
-        elif "devops" in role_lower:
-            requirements["required"] = ["Docker", "CI/CD", "Linux", "Git"]
-            requirements["recommended"] = ["Kubernetes", "AWS", "Terraform", "Jenkins"]
-        elif "data scientist" in role_lower or "data science" in role_lower:
-            requirements["required"] = ["Python", "SQL", "Statistics", "Machine Learning"]
-            requirements["recommended"] = ["Pandas", "NumPy", "Scikit-learn", "TensorFlow", "Jupyter"]
-        elif "ml engineer" in role_lower or "machine learning" in role_lower:
-            requirements["required"] = ["Python", "Machine Learning", "Deep Learning", "TensorFlow", "PyTorch"]
-            requirements["recommended"] = ["MLOps", "Docker", "Kubernetes", "AWS", "Data Pipelines", "Model Deployment", "Hugging Face", "LangChain"]
-        elif "ai engineer" in role_lower or "artificial intelligence" in role_lower:
-            requirements["required"] = ["Python", "Machine Learning", "Deep Learning", "NLP", "Computer Vision"]
-            requirements["recommended"] = ["TensorFlow", "PyTorch", "LLM", "RAG", "Vector Databases", "LangChain", "Transformers"]
-        elif "data engineer" in role_lower:
-            requirements["required"] = ["Python", "SQL", "ETL", "Data Pipelines"]
-            requirements["recommended"] = ["Apache Spark", "Airflow", "Kafka", "AWS", "Snowflake", "dbt"]
-        elif "cloud" in role_lower or "aws" in role_lower or "azure" in role_lower:
-            requirements["required"] = ["Cloud Platforms", "Linux", "Networking", "Security"]
-            requirements["recommended"] = ["AWS", "Azure", "GCP", "Terraform", "Kubernetes", "CI/CD"]
-        elif "mobile" in role_lower or "ios" in role_lower or "android" in role_lower:
-            requirements["required"] = ["Mobile Development", "UI/UX", "API Integration"]
-            requirements["recommended"] = ["React Native", "Flutter", "Swift", "Kotlin", "Firebase"]
-        else:
-            # General requirements
-            requirements["required"] = ["Programming", "Problem Solving"]
-            requirements["recommended"] = ["Git", "Communication", "Teamwork"]
-
-        return requirements
+        """Get skill requirements for a specific role. Delegates to role_embeddings module."""
+        from app.services.role_embeddings import get_role_requirements
+        return get_role_requirements(role)
 
     async def get_job_match(self, user_id: str | None, role: str | None = None) -> dict[str, Any]:
         """Get job matching score for specific role."""

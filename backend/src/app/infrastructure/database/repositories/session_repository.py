@@ -90,10 +90,10 @@ class SessionRepository:
             session.last_accessed_at = datetime.utcnow()
             self.session.flush()
 
-    def delete_session(self, session_id: str) -> bool:
-        """Delete a session."""
+    def delete_session(self, session_id: str, user_id: str) -> bool:
+        """Delete a session owned by a specific user."""
         session = self.get_by_id(session_id)
-        if session:
+        if session and session.user_id == user_id:
             self.session.delete(session)
             self.session.flush()
             return True

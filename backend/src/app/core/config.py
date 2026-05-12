@@ -55,6 +55,20 @@ class Settings(BaseSettings):
         description="CORS allowed origins (comma-separated, use * for all)",
     )
 
+    # Authentication configuration
+    auth_required: bool = Field(
+        default=False,
+        description="When true, all protected routes require a valid JWT bearer token",
+    )
+    jwt_secret: str | None = Field(
+        default=None,
+        description="JWT signing secret used to validate bearer tokens",
+    )
+    jwt_algorithm: str = Field(
+        default="HS256",
+        description="JWT signing algorithm",
+    )
+
     @field_validator("google_api_key")
     @classmethod
     def validate_google_api_key(cls, v: str) -> str:
@@ -71,11 +85,13 @@ class Settings(BaseSettings):
     @field_validator("model_name")
     @classmethod
     def validate_model_name(cls, v: str) -> str:
-        """Validate model name is one of the supported models."""
-        valid_models = [Models.FLASH_LITE, Models.FLASH, Models.PRO]
-        if v not in valid_models:
-            raise ValueError(f"Model must be one of: {', '.join(valid_models)}")
-        return v
+        """Validate model name format while allowing forward-compatible Gemini IDs."""
+        model_name = v.strip()
+        if not model_name:
+            raise ValueError("Model name cannot be empty")
+        if not model_name.startswith("gemini-"):
+            raise ValueError("Model name must start with 'gemini-'")
+        return model_name
 
     model_config = SettingsConfigDict(
         env_file=".env.local",
