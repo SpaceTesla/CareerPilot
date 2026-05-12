@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClipboardList } from "lucide-react";
 import { useInterviewPrep } from "@/hooks/queries/useInterview";
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 
 interface InterviewPrepTipsProps {
   userId: string | null;
@@ -65,14 +66,12 @@ export default function InterviewPrepTips({
           />
         </div>
 
-        {/* Tips */}
+        {/* Tips - Now with Markdown Rendering */}
         {data.tips && (
           <div>
             <h3 className="text-lg font-semibold mb-3">Preparation Tips</h3>
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <pre className="whitespace-pre-wrap text-sm font-sans bg-muted p-4 rounded-lg">
-                {data.tips}
-              </pre>
+            <div className="bg-muted/50 p-4 rounded-lg">
+              <MarkdownRenderer content={data.tips} />
             </div>
           </div>
         )}

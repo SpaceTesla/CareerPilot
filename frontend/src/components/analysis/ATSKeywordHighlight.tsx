@@ -16,6 +16,10 @@ interface ATSKeywordHighlightProps {
   targetRole?: string;
 }
 
+interface ResumeData {
+  [key: string]: unknown;
+}
+
 export default function ATSKeywordHighlight({
   userId,
   targetRole,
@@ -30,13 +34,13 @@ export default function ATSKeywordHighlight({
     ? localStorage.getItem("cp_profile_id") 
     : null;
 
-  const { data: resumeData } = useQuery({
+  const { data: resumeData } = useQuery<ResumeData>({
     queryKey: ["resume", "profile", profileId || userId],
     queryFn: () => {
       if (profileId) {
-        return apiRequest(`/resume/${profileId}`);
+        return apiRequest<ResumeData>(`/resume/${profileId}`);
       } else if (userId) {
-        return apiRequest(`/resume/user/${userId}`);
+        return apiRequest<ResumeData>(`/resume/user/${userId}`);
       }
       throw new Error("No profile_id or user_id available");
     },

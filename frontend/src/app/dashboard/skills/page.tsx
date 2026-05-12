@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import SkillsGapChart from "@/components/analysis/SkillsGapChart";
+import ATSScoreCard from "@/components/analysis/ATSScoreCard";
 import ATSKeywordHighlight from "@/components/analysis/ATSKeywordHighlight";
 
 export default function SkillsPage() {
@@ -17,6 +18,7 @@ export default function SkillsPage() {
   return (
     <div className="space-y-6">
       <SkillsGapChart userId={userId} />
+      <ATSScoreCard userId={userId} />
       <ATSKeywordHighlight userId={userId} />
     </div>
   );

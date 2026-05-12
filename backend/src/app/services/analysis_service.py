@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from app.services.agent.tools.analysis_tools import (
@@ -19,9 +20,12 @@ class AnalysisService:
         if not user_id:
             return {"error": "User ID is required"}
 
-        strengths_analysis = await analyze_resume_strengths_tool(user_id)
-        improvements = await suggest_improvements_tool(user_id)
-        metrics = await get_resume_metrics_tool(user_id)
+        # Run all analysis tools in parallel for faster response
+        strengths_analysis, improvements, metrics = await asyncio.gather(
+            analyze_resume_strengths_tool(user_id),
+            suggest_improvements_tool(user_id),
+            get_resume_metrics_tool(user_id),
+        )
 
         if "error" in strengths_analysis:
             return strengths_analysis
@@ -46,6 +50,53 @@ class AnalysisService:
             "improvements": improvements,
             "metrics": metrics,
         }
+
+    async def get_overview_for_profile(self, profile_id: str | None) -> dict[str, Any]:
+        """Get analysis overview for a specific profile ID."""
+        if not profile_id:
+            return {"error": "Profile ID is required"}
+
+        from app.infrastructure.database.connection import get_session
+        from app.infrastructure.database.repositories.resume_repository import ResumeRepository
+
+        # Get profile to find the user_id
+        with get_session() as session:
+            repo = ResumeRepository(session)
+            profile = repo.get_by_id(profile_id)
+            if not profile:
+                return {"error": "Profile not found"}
+            user_id = profile.user_id
+
+        # Use the regular overview method with the user_id
+        # Note: This assumes the tools will work with this user_id
+        # For a more accurate per-profile analysis, tools would need to be updated
+        # to accept profile_id directly. For now, we'll use a simplified approach.
+        
+        from app.services.agent.tools.analysis_tools import (
+            analyze_resume_strengths_for_profile_tool,
+        )
+
+        try:
+            strengths_analysis = await analyze_resume_strengths_for_profile_tool(profile_id)
+            if "error" in strengths_analysis:
+                return strengths_analysis
+
+            raw_score = strengths_analysis.get("overall_score", 0)
+            if raw_score > 1:
+                overall_score = min(raw_score, 100)
+            else:
+                overall_score = min(raw_score * 100, 100)
+            
+            grade = self._calculate_grade(overall_score)
+
+            return {
+                "overall_score": round(overall_score, 1),
+                "grade": grade,
+                "strengths": strengths_analysis.get("strengths", []),
+                "weaknesses": strengths_analysis.get("areas_for_improvement", []),
+            }
+        except Exception as e:
+            return {"error": f"Analysis failed: {str(e)}"}
 
     def _calculate_grade(self, score: float) -> str:
         """Calculate letter grade from score (0-100)."""
@@ -123,73 +174,67 @@ class AnalysisService:
         return keywords
 
     async def get_skills_gap(self, user_id: str | None, target_role: str | None = None) -> dict[str, Any]:
-        """Analyze skills gap for target role."""
+        """Analyze skills gap for target role using hybrid exact + semantic scoring."""
         if not user_id:
             return {"error": "User ID is required"}
 
         from app.services.agent.tools.resume_tools import get_skills_tool
+        from app.services.role_embeddings import compute_semantic_gap_score, get_role_requirements
 
         skills_data = await get_skills_tool(user_id)
         if "error" in skills_data:
             return skills_data
 
-        # Define required skills for common roles
-        role_requirements = self._get_role_requirements(target_role)
+        current_skills: list[str] = []
+        current_skills.extend(skills_data.get("languages", []))
+        current_skills.extend(skills_data.get("frameworks", []))
+        current_skills.extend(skills_data.get("tools", []))
 
-        current_skills = set()
-        current_skills.update(skills_data.get("languages", []))
-        current_skills.update(skills_data.get("frameworks", []))
-        current_skills.update(skills_data.get("tools", []))
-
+        role_requirements = get_role_requirements(target_role)
+        current_set = set(current_skills)
         required_skills = set(role_requirements.get("required", []))
         recommended_skills = set(role_requirements.get("recommended", []))
 
-        missing_required = required_skills - current_skills
-        missing_recommended = recommended_skills - current_skills
-        matching_skills = current_skills & (required_skills | recommended_skills)
+        missing_required = required_skills - current_set
+        missing_recommended = recommended_skills - current_set
+        matching_skills = current_set & (required_skills | recommended_skills)
 
-        gap_score = (len(matching_skills) / len(required_skills | recommended_skills) * 100) if (required_skills | recommended_skills) else 0
+        # Retrieve stored skills embedding from the profile (if available)
+        resume_embedding: list[float] | None = None
+        try:
+            from app.infrastructure.database.connection import get_session
+            from app.infrastructure.database.repositories.resume_repository import ResumeRepository
+
+            with get_session() as session:
+                repo = ResumeRepository(session)
+                profiles = repo.get_by_user(user_id)
+                if profiles:
+                    profile = sorted(profiles, key=lambda p: p.updated_at, reverse=True)[0]
+                    stored = getattr(profile, "skills_embedding", None)
+                    if stored is not None and isinstance(stored, list):
+                        resume_embedding = stored
+        except Exception:
+            pass
+
+        # Semantic gap score (falls back to exact if embeddings not available)
+        gap_score = await compute_semantic_gap_score(
+            current_skills, target_role, resume_embedding
+        )
 
         return {
             "target_role": target_role or "General",
-            "current_skills": list(current_skills),
+            "current_skills": list(current_set),
             "missing_required": list(missing_required),
             "missing_recommended": list(missing_recommended),
             "matching_skills": list(matching_skills),
-            "gap_score": round(gap_score, 1),
-            "recommendations": list(missing_required)[:5],  # Top 5 to focus on
+            "gap_score": gap_score,
+            "recommendations": list(missing_required)[:5],
         }
 
     def _get_role_requirements(self, role: str | None) -> dict[str, list[str]]:
-        """Get skill requirements for a specific role."""
-        role_lower = (role or "").lower()
-
-        requirements = {
-            "required": [],
-            "recommended": [],
-        }
-
-        if "backend" in role_lower:
-            requirements["required"] = ["Python", "SQL", "API", "Database"]
-            requirements["recommended"] = ["Django", "Flask", "PostgreSQL", "REST", "Docker"]
-        elif "frontend" in role_lower:
-            requirements["required"] = ["JavaScript", "HTML", "CSS", "React"]
-            requirements["recommended"] = ["TypeScript", "Next.js", "TailwindCSS", "Git"]
-        elif "fullstack" in role_lower or "full-stack" in role_lower:
-            requirements["required"] = ["JavaScript", "Python", "React", "SQL"]
-            requirements["recommended"] = ["Node.js", "TypeScript", "Docker", "AWS"]
-        elif "devops" in role_lower:
-            requirements["required"] = ["Docker", "CI/CD", "Linux", "Git"]
-            requirements["recommended"] = ["Kubernetes", "AWS", "Terraform", "Jenkins"]
-        elif "data" in role_lower:
-            requirements["required"] = ["Python", "SQL", "Data Analysis"]
-            requirements["recommended"] = ["Pandas", "Machine Learning", "Statistics"]
-        else:
-            # General requirements
-            requirements["required"] = ["Programming", "Problem Solving"]
-            requirements["recommended"] = ["Git", "Communication", "Teamwork"]
-
-        return requirements
+        """Get skill requirements for a specific role. Delegates to role_embeddings module."""
+        from app.services.role_embeddings import get_role_requirements
+        return get_role_requirements(role)
 
     async def get_job_match(self, user_id: str | None, role: str | None = None) -> dict[str, Any]:
         """Get job matching score for specific role."""

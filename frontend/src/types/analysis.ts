@@ -48,6 +48,10 @@ export interface ATSScore {
   ats_score: number;
   keyword_suggestions: string[];
   optimization_tips: string[];
+  semantic_analysis?: string;
+  format_score?: number;
+  content_score?: number;
+  keyword_density?: number;
 }
 
 export interface SkillsGap {
@@ -181,6 +185,117 @@ export interface ComparisonItem {
   industry_average: number;
   status: string;
   required?: number;
+}
+
+// ── Job Application Tracking ───────────────────────────────────────────────
+
+export type ApplicationStatus =
+  | "applied"
+  | "interviewing"
+  | "offer"
+  | "rejected"
+  | "withdrawn";
+
+export interface JobApplication {
+  id: string;
+  user_id: string;
+  job_title: string;
+  company: string | null;
+  job_url: string | null;
+  source: string | null;
+  location: string | null;
+  status: ApplicationStatus;
+  notes: string | null;
+  job_data: Record<string, unknown> | null;
+  applied_at: string | null;
+  updated_at: string | null;
+}
+
+export interface JobApplicationsResponse {
+  applications: JobApplication[];
+  total: number;
+  by_status: Record<ApplicationStatus, number>;
+}
+
+// ── Recommendation Feedback ────────────────────────────────────────────────
+
+export type FeedbackValue = "helpful" | "not_helpful";
+export type FeedbackItemType = "job" | "course";
+
+export interface RecommendationFeedback {
+  id: string;
+  user_id: string;
+  item_type: FeedbackItemType;
+  item_identifier: string;
+  feedback: FeedbackValue;
+  is_helpful: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface FeedbackResponse {
+  feedback: RecommendationFeedback[];
+  total: number;
+}
+
+// ── Playwright Auto-Fill ───────────────────────────────────────────────────
+
+export type AutoFillStatus =
+  | "filled"
+  | "unsupported"
+  | "no_fields_found"
+  | "error";
+
+/** Legacy: blocking response (kept for compat) */
+export interface AutoFillResult {
+  status: AutoFillStatus;
+  portal: string | null;
+  fields_filled: string[];
+  screenshot: string | null; // base64 PNG
+  message: string;
+}
+
+// ── Task-based autofill (non-blocking + polling) ───────────────────────────
+
+/** Returned immediately by POST /auto-fill */
+export interface AutoFillStartResult {
+  task_id: string;
+  status: "started";
+  portal: string | null;
+  poll_url: string;
+}
+
+/** A single progress step captured during autofill */
+export interface AutoFillStep {
+  step: "navigating" | "loaded" | "analyzing" | "filling" | "done" | "no_fields" | "error" | "session_missing" | "awaiting_confirmation";
+  message: string;
+  screenshot: string | null; // base64 JPEG, null for some steps
+  timestamp: string;         // ISO
+}
+
+export type AutoFillTaskStatus = "pending" | "running" | "done" | "error" | "awaiting_confirmation";
+
+export interface AutoFillConfirmDetails {
+  job: string;
+  portal: string | null;
+  fields_filled: string[];
+  filling_summary: string[];
+}
+
+/** Returned by GET /auto-fill/{task_id} */
+export interface AutoFillTask {
+  task_id: string;
+  status: AutoFillTaskStatus;
+  user_id: string;
+  job_url: string;
+  portal: string | null;
+  steps: AutoFillStep[];
+  fields_filled: string[];
+  result_status: AutoFillStatus | "unsupported" | "submitted" | "cancelled" | null;
+  error: string | null;
+  started_at: string;
+  finished_at: string | null;
+  confirm_details?: AutoFillConfirmDetails;
 }
 
 

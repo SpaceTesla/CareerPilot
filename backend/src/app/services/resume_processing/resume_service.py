@@ -87,12 +87,16 @@ class ResumeService:
             temp_path = Path(f.name)
 
         try:
-            return self.process_resume(
+            data = self.process_resume(
                 temp_path,
                 enrich=enrich,
                 save_output=False,
-                source_file=source_file,
             )
+            if source_file:
+                metadata = data.setdefault("metadata", {})
+                if isinstance(metadata, dict):
+                    metadata.setdefault("source_file", source_file)
+            return data
         finally:
             # Clean up temporary file
             temp_path.unlink(missing_ok=True)

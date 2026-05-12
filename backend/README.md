@@ -1,5 +1,7 @@
 ## Backend – CareerPilot API
 
+> The API surface is larger than this file describes (resume, analysis, jobs, applications, auth, and more). Run the server and open **`/docs`** for the live OpenAPI catalog, or see the repository root **`README.md`** for the full stack.
+
 FastAPI service that powers CareerPilot. Provides chat endpoints backed by Google Gemini via LangChain, with both standard and Server-Sent Events (SSE) streaming responses.
 
 ### Prerequisites
@@ -14,6 +16,7 @@ Create `./.env.local` in the `backend/` directory:
 ```
 # Required
 GOOGLE_API_KEY=your_google_api_key_here
+TAVILY_API_KEY=your_tavily_api_key_here
 
 # Optional (defaults shown)
 MODEL_NAME=gemini-2.5-flash      # allowed: gemini-2.5-flash-lite | gemini-2.5-flash | gemini-2.5-pro

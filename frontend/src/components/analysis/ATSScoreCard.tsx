@@ -128,7 +128,7 @@ export default function ATSScoreCard({ userId }: ATSScoreCardProps) {
             <div>
               <h3 className="text-sm font-medium mb-2">Keyword Suggestions</h3>
               <div className="flex flex-wrap gap-2">
-                {data.keyword_suggestions.slice(0, 5).map((keyword, idx) => (
+                {data.keyword_suggestions.slice(0, 8).map((keyword, idx) => (
                   <Badge key={idx} variant="secondary" className="text-xs">
                     {keyword}
                   </Badge>
@@ -137,12 +137,38 @@ export default function ATSScoreCard({ userId }: ATSScoreCardProps) {
             </div>
           )}
 
+          {/* Semantic Analysis Summary */}
+          {data.semantic_analysis && (
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <h3 className="text-sm font-medium mb-1">AI Analysis</h3>
+              <p className="text-sm text-muted-foreground">{data.semantic_analysis}</p>
+            </div>
+          )}
+
+          {/* Score Breakdown */}
+          {(data.format_score !== undefined || data.content_score !== undefined) && (
+            <div className="grid grid-cols-2 gap-4 text-center">
+              {data.format_score !== undefined && (
+                <div className="p-2 bg-muted/30 rounded">
+                  <p className="text-xs text-muted-foreground">Format</p>
+                  <p className="text-lg font-semibold">{Math.round(data.format_score)}</p>
+                </div>
+              )}
+              {data.content_score !== undefined && (
+                <div className="p-2 bg-muted/30 rounded">
+                  <p className="text-xs text-muted-foreground">Content</p>
+                  <p className="text-lg font-semibold">{Math.round(data.content_score)}</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Optimization Tips */}
           {data.optimization_tips && data.optimization_tips.length > 0 && (
             <div>
               <h3 className="text-sm font-medium mb-2">Optimization Tips</h3>
               <ul className="space-y-1">
-                {data.optimization_tips.slice(0, 3).map((tip, idx) => (
+                {data.optimization_tips.slice(0, 5).map((tip, idx) => (
                   <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
                     <span className="text-primary mt-0.5">•</span>
                     <span>{tip}</span>

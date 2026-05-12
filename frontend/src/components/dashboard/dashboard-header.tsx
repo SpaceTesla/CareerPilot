@@ -22,23 +22,33 @@ import { apiRequest } from "@/lib/api";
 import ExportButton from "@/components/analysis/ExportButton";
 import { useAnalysisOverview, useATSScore } from "@/hooks/queries/useAnalysis";
 import { Skeleton } from "@/components/ui/skeleton";
+import SessionSwitcher from "@/components/analysis/SessionSwitcher";
+
+interface UserProfile {
+  name?: string;
+  email?: string;
+  [key: string]: unknown;
+}
 
 export function DashboardHeader() {
   const pathname = usePathname();
   const userId = typeof window !== "undefined" 
     ? localStorage.getItem("cp_user_id") 
     : null;
+  const profileId = typeof window !== "undefined"
+    ? localStorage.getItem("cp_profile_id")
+    : null;
 
   // Fetch user profile for name
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  const { data: profile, isLoading: profileLoading } = useQuery<UserProfile | null>({
     queryKey: ["resume", "profile", userId],
     queryFn: () => {
       if (!userId) return null;
       const profileId = localStorage.getItem("cp_profile_id");
       if (profileId) {
-        return apiRequest(`/resume/${profileId}`);
+        return apiRequest<UserProfile>(`/resume/${profileId}`);
       }
-      return apiRequest(`/resume/user/${userId}`);
+      return apiRequest<UserProfile>(`/resume/user/${userId}`);
     },
     enabled: !!userId,
   });
@@ -77,7 +87,12 @@ export function DashboardHeader() {
           orientation="vertical"
           className="mx-2 data-[orientation=vertical]:h-4"
         />
-        <h1 className="text-base font-medium flex-1">{getPageTitle()}</h1>
+        <h1 className="text-base font-medium">{getPageTitle()}</h1>
+        
+        {/* Session Switcher */}
+        <SessionSwitcher userId={userId} currentProfileId={profileId} />
+        
+        <div className="flex-1" />
         
         {/* Quick Stats - Right side */}
         <div className="hidden lg:flex items-center gap-2 flex-shrink-0">

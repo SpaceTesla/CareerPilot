@@ -4,9 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExternalLink, BookOpen } from "lucide-react";
+import { ExternalLink, BookOpen, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
+import { useFeedback, useSubmitFeedback, useDeleteFeedback } from "@/hooks/queries/useFeedback";
+import { cn } from "@/lib/utils";
 
 interface CourseRecommendationsProps {
   userId: string | null;
@@ -37,6 +39,20 @@ export default function CourseRecommendations({
       ),
     enabled: !!userId,
   });
+
+  const { feedbackMap } = useFeedback(userId, "course");
+  const submitFeedback = useSubmitFeedback();
+  const deleteFeedback = useDeleteFeedback();
+
+  const handleFeedback = (identifier: string, value: "helpful" | "not_helpful") => {
+    if (!userId) return;
+    const current = feedbackMap.get(identifier);
+    if (current === value) {
+      deleteFeedback.mutate({ user_id: userId, item_type: "course", item_identifier: identifier });
+    } else {
+      submitFeedback.mutate({ user_id: userId, item_type: "course", item_identifier: identifier, feedback: value });
+    }
+  };
 
   const courses = data?.courses || [];
 
@@ -92,23 +108,42 @@ export default function CourseRecommendations({
                         </p>
                       )}
                     </div>
-                    {course.url && (
+                    <div className="flex items-center gap-1 shrink-0">
                       <Button
-                        variant="default"
-                        size="sm"
-                        className="shrink-0"
-                        asChild
+                        variant="ghost"
+                        size="icon"
+                        className={cn("h-7 w-7", feedbackMap.get(course.url || course.title) === "helpful" && "text-green-600")}
+                        onClick={() => handleFeedback(course.url || course.title, "helpful")}
+                        title="Helpful"
                       >
-                        <a
-                          href={course.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          View
-                        </a>
+                        <ThumbsUp className="h-4 w-4" />
                       </Button>
-                    )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn("h-7 w-7", feedbackMap.get(course.url || course.title) === "not_helpful" && "text-red-500")}
+                        onClick={() => handleFeedback(course.url || course.title, "not_helpful")}
+                        title="Not helpful"
+                      >
+                        <ThumbsDown className="h-4 w-4" />
+                      </Button>
+                      {course.url && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          asChild
+                        >
+                          <a
+                            href={course.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            View
+                          </a>
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

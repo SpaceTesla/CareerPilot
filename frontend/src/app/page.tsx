@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import {
+  useState,
+  useCallback,
+  type ChangeEvent,
+  type DragEvent,
+  type FormEvent,
+} from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
   CardContent,
@@ -15,27 +21,127 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileText, AlertCircle, CheckCircle2 } from "lucide-react";
-import { apiFormRequest } from "@/lib/api";
+import { apiFormRequest, apiRequest } from "@/lib/api";
+import { clearCache, setCachedData } from "@/lib/query-persister";
 import { toast } from "sonner";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [isProcessingJob, setIsProcessingJob] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatusMessage, setUploadStatusMessage] = useState("Preparing upload...");
   const router = useRouter();
+  const queryClient = useQueryClient();
+
+  type ResumeJobStatus = {
+    job_id: string;
+    status: "queued" | "processing" | "completed" | "failed";
+    progress: number;
+    message: string | null;
+    error: string | null;
+    user_id?: string;
+    profile_id?: string;
+    session_id?: string;
+    resume_session_id?: string;
+  };
+
+  const pollResumeJob = async (jobId: string) => {
+    const maxAttempts = 240;
+    const pollIntervalMs = 1500;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const status = await apiRequest<ResumeJobStatus>(`/resume/jobs/${jobId}`);
+
+      setUploadProgress(Math.max(0, Math.min(100, status.progress ?? 0)));
+      setUploadStatusMessage(status.message || "Processing resume...");
+
+      if (status.status === "completed") {
+        return status;
+      }
+
+      if (status.status === "failed") {
+        throw new Error(status.error || "Resume processing failed");
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    }
+
+    throw new Error("Resume processing timed out. Please try again.");
+  };
+
+  // Prefetch and persist recommendations data for smoother UX
+  const prefetchRecommendations = async (userId: string) => {
+    // Clear old cache for fresh data on new resume upload
+    clearCache();
+    
+    // Helper to fetch, cache in React Query, and persist to localStorage
+    const fetchAndPersist = async <T,>(queryKey: unknown[], endpoint: string) => {
+      try {
+        const data = await apiRequest<T>(endpoint);
+        // Cache in React Query
+        queryClient.setQueryData(queryKey, data);
+        // Persist to localStorage
+        setCachedData(queryKey, data);
+        return data;
+      } catch {
+        // Silently fail - prefetch is optional
+        return null;
+      }
+    };
+
+    // Prefetch in parallel - these will be cached for when user visits those pages
+    const prefetchPromises = [
+      fetchAndPersist(
+        ["analysis", "overview", userId],
+        `/analysis/overview?user_id=${userId}`
+      ),
+      fetchAndPersist(
+        ["jobs", "recommendations", userId, 10],
+        `/jobs/recommendations?user_id=${userId}&limit=10`
+      ),
+      fetchAndPersist(
+        ["analysis", "career-path", userId],
+        `/analysis/career-path?user_id=${userId}`
+      ),
+      fetchAndPersist(
+        ["analysis", "ats-score", userId],
+        `/analysis/ats-score?user_id=${userId}`
+      ),
+      fetchAndPersist(
+        ["interview", "prep", userId, undefined],
+        `/interview/prep?user_id=${userId}`
+      ),
+      fetchAndPersist(
+        ["interview", "questions", "category", userId, undefined],
+        `/interview/questions-by-category?user_id=${userId}`
+      ),
+    ];
+
+    // Run in background
+    Promise.allSettled(prefetchPromises).catch(() => {
+      // Silently fail - these are just prefetches for UX improvement
+    });
+  };
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      return apiFormRequest<{
-        user_id: string;
-        profile_id: string;
-        session_id: string;
-        data: unknown;
-      }>(`/resume/upload?enrich=true`, formData);
+      const queuedJob = await apiFormRequest<{
+        job_id: string;
+        status: string;
+        progress: number;
+        message: string;
+      }>(`/resume/upload/async?enrich=true`, formData);
+
+      setIsProcessingJob(true);
+      setUploadProgress(Math.max(queuedJob.progress ?? 5, 5));
+      setUploadStatusMessage(queuedJob.message || "Resume queued for processing");
+
+      return pollResumeJob(queuedJob.job_id);
     },
-    onSuccess: (data) => {
-      // Persist identifiers
+    onSuccess: (data: ResumeJobStatus) => {
       try {
         if (data.user_id) {
           localStorage.setItem("cp_user_id", String(data.user_id));
@@ -46,21 +152,30 @@ export default function Home() {
         if (data.profile_id) {
           localStorage.setItem("cp_profile_id", String(data.profile_id));
         }
-      } catch (_) {
+        if (data.resume_session_id) {
+          localStorage.setItem("cp_resume_session_id", String(data.resume_session_id));
+        }
+      } catch {
         // no-op if storage fails
       }
 
       toast.success("Resume uploaded successfully!");
 
-      // Redirect to dashboard overview
+      if (data.user_id) {
+        prefetchRecommendations(data.user_id);
+      }
+
       router.push("/dashboard/overview");
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to upload resume");
     },
+    onSettled: () => {
+      setIsProcessingJob(false);
+    },
   });
 
-  const handleDrag = useCallback((e: React.DragEvent) => {
+  const handleDrag = useCallback((e: DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (e.type === "dragenter" || e.type === "dragover") {
@@ -70,7 +185,7 @@ export default function Home() {
     }
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback((e: DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
@@ -100,14 +215,14 @@ export default function Home() {
     return true;
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile && validateFile(selectedFile)) {
       setFile(selectedFile);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!file) {
       toast.error("Please select a file");
@@ -198,26 +313,26 @@ export default function Home() {
               </Alert>
             )}
 
-            {uploadMutation.isPending && (
+            {(uploadMutation.isPending || isProcessingJob) && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Processing...</span>
-                  <span className="text-muted-foreground">Please wait</span>
+                  <span className="text-muted-foreground">{uploadStatusMessage}</span>
+                  <span className="text-muted-foreground">{uploadProgress}%</span>
                 </div>
-                <Progress value={undefined} className="h-2" />
+                <Progress value={uploadProgress} className="h-2" />
               </div>
             )}
 
             <Button
               type="submit"
-              disabled={!file || uploadMutation.isPending}
+              disabled={!file || uploadMutation.isPending || isProcessingJob}
               className="w-full"
               size="lg"
             >
-              {uploadMutation.isPending ? (
+              {uploadMutation.isPending || isProcessingJob ? (
                 <>
                   <Upload className="mr-2 h-4 w-4 animate-pulse" />
-                  Processing...
+                  Processing Resume...
                 </>
               ) : (
                 <>

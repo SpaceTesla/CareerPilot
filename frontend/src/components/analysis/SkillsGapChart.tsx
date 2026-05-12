@@ -19,8 +19,13 @@ const commonRoles = [
   "Backend Developer",
   "Frontend Developer",
   "Full-Stack Developer",
-  "DevOps Engineer",
+  "ML Engineer",
   "Data Scientist",
+  "AI Engineer",
+  "DevOps Engineer",
+  "Data Engineer",
+  "Cloud Engineer",
+  "Mobile Developer",
 ];
 
 export default function SkillsGapChart({ userId }: SkillsGapChartProps) {
