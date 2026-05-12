@@ -2,8 +2,9 @@
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Path
+from fastapi import APIRouter, Depends, HTTPException, Query, Path
 
+from app.api.dependencies.auth import enforce_user_access, get_authenticated_user_id
 from app.core.logging import get_logger
 from app.infrastructure.database.connection import get_session
 from app.infrastructure.database.repositories.session_repository import SessionRepository
@@ -18,9 +19,11 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 async def list_sessions(
     user_id: str = Query(..., description="User ID"),
     limit: int = Query(20, description="Maximum number of sessions to return"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """List all resume sessions for a user."""
     try:
+        enforce_user_access(user_id, auth_user_id)
         with get_session() as session:
             repo = SessionRepository(session)
             sessions = repo.list_sessions_with_profiles(user_id, limit)
@@ -39,9 +42,11 @@ async def list_sessions(
 @router.get("/active")
 async def get_active_session(
     user_id: str = Query(..., description="User ID"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """Get the currently active session for a user."""
     try:
+        enforce_user_access(user_id, auth_user_id)
         with get_session() as session:
             repo = SessionRepository(session)
             active_session = repo.get_active_session(user_id)
@@ -61,15 +66,20 @@ async def get_active_session(
 @router.get("/{session_id}")
 async def get_session_details(
     session_id: str = Path(..., description="Session ID"),
+    user_id: str = Query(..., description="User ID"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """Get details of a specific session."""
     try:
+        enforce_user_access(user_id, auth_user_id)
         with get_session() as session:
             repo = SessionRepository(session)
             session_data = repo.get_session_with_profile(session_id)
 
             if not session_data:
                 raise HTTPException(status_code=404, detail="Session not found")
+            if session_data["user_id"] != user_id:
+                raise HTTPException(status_code=403, detail="Access denied")
 
             return session_data
     except HTTPException:
@@ -85,9 +95,11 @@ async def get_session_details(
 async def switch_session(
     session_id: str = Path(..., description="Session ID to switch to"),
     user_id: str = Query(..., description="User ID"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """Switch to a different resume session."""
     try:
+        enforce_user_access(user_id, auth_user_id)
         with get_session() as session:
             repo = SessionRepository(session)
             switched_session = repo.switch_session(session_id, user_id)
@@ -117,9 +129,11 @@ async def create_session(
     user_id: str = Query(..., description="User ID"),
     profile_id: str = Query(..., description="Profile ID"),
     name: str | None = Query(None, description="Session name"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """Create a new session for a resume profile."""
     try:
+        enforce_user_access(user_id, auth_user_id)
         with get_session() as session:
             repo = SessionRepository(session)
             new_session = repo.create_session(user_id, profile_id, name)
@@ -141,12 +155,15 @@ async def create_session(
 @router.delete("/{session_id}")
 async def delete_session(
     session_id: str = Path(..., description="Session ID to delete"),
+    user_id: str = Query(..., description="User ID"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """Delete a session."""
     try:
+        enforce_user_access(user_id, auth_user_id)
         with get_session() as session:
             repo = SessionRepository(session)
-            deleted = repo.delete_session(session_id)
+            deleted = repo.delete_session(session_id, user_id)
 
             if not deleted:
                 raise HTTPException(status_code=404, detail="Session not found")
@@ -164,9 +181,11 @@ async def delete_session(
 @router.get("/scores/trends")
 async def get_session_score_trends(
     user_id: str = Query(..., description="User ID"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """Get score trends across all resume sessions for visualization."""
     try:
+        enforce_user_access(user_id, auth_user_id)
         with get_session() as db_session:
             repo = SessionRepository(db_session)
             sessions = repo.get_by_user(user_id, limit=10)

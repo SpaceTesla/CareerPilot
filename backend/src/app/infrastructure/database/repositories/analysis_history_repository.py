@@ -18,8 +18,7 @@ class AnalysisHistoryRepository:
     def create(self, history: AnalysisHistory) -> AnalysisHistory:
         """Create a new analysis history record."""
         self.session.add(history)
-        self.session.commit()
-        self.session.refresh(history)
+        self.session.flush()
         return history
 
     def get_by_user(self, user_id: str) -> list[AnalysisHistory]:

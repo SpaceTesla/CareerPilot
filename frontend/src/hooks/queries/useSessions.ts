@@ -111,9 +111,15 @@ export function useDeleteSession() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (sessionId: string) =>
+    mutationFn: ({
+      sessionId,
+      userId,
+    }: {
+      sessionId: string;
+      userId: string;
+    }) =>
       apiRequest<{ success: boolean; message: string }>(
-        `/sessions/${sessionId}`,
+        `/sessions/${sessionId}?user_id=${userId}`,
         { method: "DELETE" }
       ),
     onSuccess: () => {

@@ -26,6 +26,10 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const accessToken =
+    typeof window !== "undefined"
+      ? localStorage.getItem("cp_access_token")
+      : null;
 
   try {
     const controller = new AbortController();
@@ -36,6 +40,7 @@ export async function apiRequest<T>(
       signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...options?.headers,
       },
     });
@@ -74,6 +79,10 @@ export async function apiFormRequest<T>(
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const accessToken =
+    typeof window !== "undefined"
+      ? localStorage.getItem("cp_access_token")
+      : null;
 
   try {
     const controller = new AbortController();
@@ -84,6 +93,11 @@ export async function apiFormRequest<T>(
       method: "POST",
       body: formData,
       signal: controller.signal,
+      headers: accessToken
+        ? {
+            Authorization: `Bearer ${accessToken}`,
+          }
+        : undefined,
     });
 
     if (timeoutId) clearTimeout(timeoutId);

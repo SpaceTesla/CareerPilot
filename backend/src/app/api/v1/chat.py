@@ -1,8 +1,9 @@
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Path
+from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sse_starlette.sse import EventSourceResponse
 
+from app.api.dependencies.auth import enforce_user_access, get_authenticated_user_id
 from app.core.logging import get_logger
 from app.infrastructure.database.connection import get_session
 from app.infrastructure.database.repositories.conversation_repository import (
@@ -83,9 +84,11 @@ async def chat_stream_route(
 async def get_chat_history(
     user_id: str = Query(..., description="User ID"),
     limit: int = Query(50, description="Maximum number of conversations to return"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """Get all chat conversations for a user."""
     try:
+        enforce_user_access(user_id, auth_user_id)
         with get_session() as session:
             repo = ConversationRepository(session)
             conversations = repo.get_by_user(user_id, limit=limit)
@@ -111,16 +114,21 @@ async def get_chat_history(
 @router.get("/history/{conversation_id}")
 async def get_conversation_messages(
     conversation_id: str = Path(..., description="Conversation ID"),
+    user_id: str = Query(..., description="User ID"),
     limit: int = Query(100, description="Maximum number of messages to return"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """Get all messages in a specific conversation."""
     try:
+        enforce_user_access(user_id, auth_user_id)
         with get_session() as session:
             repo = ConversationRepository(session)
             conversation = repo.get_by_id(conversation_id)
 
             if not conversation:
                 raise HTTPException(status_code=404, detail="Conversation not found")
+            if conversation.user_id != user_id:
+                raise HTTPException(status_code=403, detail="Access denied")
 
             messages = repo.get_messages(conversation_id, limit=limit)
 
@@ -154,9 +162,11 @@ async def get_conversation_messages(
 async def create_conversation(
     user_id: str = Query(..., description="User ID"),
     title: str | None = Query(None, description="Conversation title"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """Create a new conversation."""
     try:
+        enforce_user_access(user_id, auth_user_id)
         with get_session() as session:
             repo = ConversationRepository(session)
             conversation = repo.create_conversation(user_id=user_id, title=title)
@@ -175,11 +185,20 @@ async def create_conversation(
 @router.delete("/history/{conversation_id}")
 async def delete_conversation(
     conversation_id: str = Path(..., description="Conversation ID"),
+    user_id: str = Query(..., description="User ID"),
+    auth_user_id: str | None = Depends(get_authenticated_user_id),
 ) -> dict[str, Any]:
     """Delete a conversation and all its messages."""
     try:
+        enforce_user_access(user_id, auth_user_id)
         with get_session() as session:
             repo = ConversationRepository(session)
+            conversation = repo.get_by_id(conversation_id)
+            if not conversation:
+                raise HTTPException(status_code=404, detail="Conversation not found")
+            if conversation.user_id != user_id:
+                raise HTTPException(status_code=403, detail="Access denied")
+
             deleted = repo.delete_conversation(conversation_id)
 
             if not deleted:

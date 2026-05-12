@@ -56,16 +56,17 @@ export function useChatHistory(userId: string | null, limit = 50) {
  * Hook to fetch messages for a specific conversation
  */
 export function useConversationMessages(
+  userId: string | null,
   conversationId: string | null,
   limit = 100
 ) {
   return useQuery({
-    queryKey: ["chat", "conversation", conversationId, limit],
+    queryKey: ["chat", "conversation", userId, conversationId, limit],
     queryFn: () =>
       apiRequest<ConversationWithMessages>(
-        `/chat/history/${conversationId}?limit=${limit}`
+        `/chat/history/${conversationId}?user_id=${userId}&limit=${limit}`
       ),
-    enabled: !!conversationId,
+    enabled: !!userId && !!conversationId,
     staleTime: STALE_TIME,
     gcTime: CACHE_TIME,
   });
@@ -105,15 +106,21 @@ export function useDeleteConversation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (conversationId: string) =>
+    mutationFn: ({
+      conversationId,
+      userId,
+    }: {
+      conversationId: string;
+      userId: string;
+    }) =>
       apiRequest<{ success: boolean; message: string }>(
-        `/chat/history/${conversationId}`,
+        `/chat/history/${conversationId}?user_id=${userId}`,
         { method: "DELETE" }
       ),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       // Invalidate all chat history queries
       queryClient.invalidateQueries({
-        queryKey: ["chat", "history"],
+        queryKey: ["chat", "history", variables.userId],
       });
     },
   });

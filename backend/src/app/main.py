@@ -9,8 +9,10 @@ from sqlalchemy import text
 
 from app.api.v1.agent import router as agent_router
 from app.api.v1.analysis import router as analysis_router
+from app.api.v1.applications import router as applications_router
 from app.api.v1.chat import router as chat_router
 from app.api.v1.courses import router as courses_router
+from app.api.v1.feedback import router as feedback_router
 from app.api.v1.index import router as index_router
 from app.api.v1.interview import router as interview_router
 from app.api.v1.jobs import router as jobs_router
@@ -56,11 +58,16 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
 
 # Configure CORS
-cors_origins = settings.cors_origins.split(",") if settings.cors_origins != "*" else ["*"]
+allow_all_origins = settings.cors_origins.strip() == "*"
+cors_origins = (
+    ["*"]
+    if allow_all_origins
+    else [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_credentials=True,
+    allow_credentials=not allow_all_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -75,6 +82,8 @@ app.include_router(interview_router)
 app.include_router(progress_router)
 app.include_router(courses_router)
 app.include_router(sessions_router)
+app.include_router(applications_router)
+app.include_router(feedback_router)
 
 # Create static directory if it doesn't exist
 static_dir = "static"

@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 # Environment
 ENV PYTHONUNBUFFERED=1 \
@@ -29,6 +29,7 @@ RUN pip install \
     "langgraph>=0.6.8" \
     "pydantic[email]>=2.11.10" \
     "pydantic-settings>=2.11.0" \
+    "PyJWT>=2.10.1" \
     "python-dotenv>=1.1.1" \
     "uvicorn[standard]>=0.37.0" \
     "sse-starlette>=2.2.1" \
@@ -40,7 +41,13 @@ RUN pip install \
     "pgvector>=0.4.1" \
     "alembic>=1.17.0" \
     "tavily-python>=0.3.0" \
-    "langchain-community>=0.3.31"
+    "langchain-community>=0.3.31" \
+    "playwright>=1.40.0"
+
+# Install Playwright Chromium browser + system dependencies
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN playwright install chromium --with-deps \
+  && chmod -R 755 /ms-playwright
 
 # Copy application source
 COPY src ./src
@@ -55,4 +62,4 @@ EXPOSE 8000
 ENV PYTHONPATH=/app/src
 
 # Default command
-CMD ["python", "-m", "uvicorn", "app.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
