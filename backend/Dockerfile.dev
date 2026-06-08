@@ -1,0 +1,37 @@
+FROM python:3.13-slim
+
+# Environment
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# System packages for psycopg2, curl, and builds
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    ca-certificates \
+    curl \
+  && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip and install uv for fast dependency management
+RUN python -m pip install --upgrade pip && pip install uv
+
+WORKDIR /app
+
+# Copy dependency configuration files
+COPY pyproject.toml uv.lock* ./
+
+# Install dependencies into the system python env
+RUN uv pip install --system -r pyproject.toml
+
+# Install Playwright Chromium browser and its system dependencies
+RUN playwright install chromium --with-deps \
+  && chmod -R 755 /ms-playwright
+
+EXPOSE 8000
+
+# App env
+ENV PYTHONPATH=/app/src
+
+# Start uvicorn with hot-reloading active for development
+CMD ["python", "-m", "uvicorn", "app.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000", "--reload"]

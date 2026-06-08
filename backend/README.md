@@ -105,10 +105,40 @@ uv run ruff check --fix .
 - Port already in use: change `--port` or stop the conflicting process.
 - PowerShell execution policy: if activation fails, run PowerShell as admin and set policy appropriately.
 
+### v2 Architecture & Services (Wave 1)
+
+Starting with v2, CareerPilot introduces asynchronous backing services and structured logging:
+- **API Version 2 Root**: prefix `/api/v2`
+- **Structured Logging**: Outputs logs in JSON format for easy parsing and log aggregation.
+- **Request ID Tracing**: Adds a unique request ID (`X-Request-ID` header) to every incoming request, propagated across logs.
+- **Database Connection**: Configured asynchronously via `asyncpg` and SQLAlchemy 2.0.
+- **Health Check Endpoint**: `/api/v2/health` monitors core application state and latency for PostgreSQL, Redis, and Qdrant.
+
+#### Docker Development Environment
+
+Spin up all local backing services (PostgreSQL + pgvector, Redis, Qdrant) and the FastAPI server in hot-reload mode:
+
+```bash
+docker compose up --build
+```
+
+#### Running Tests
+
+Run the test suite verifying configurations, services connection health, and API routes:
+
+```bash
+uv run pytest
+```
+
 ### Project layout (backend)
 
-- `src/app/main.py` – FastAPI app, CORS, static mounting, logging setup
-- `src/app/api/v1/` – Routes: `index.py`, `chat.py`
-- `src/app/services/chat_service.py` – LangChain chain and streaming
-- `src/app/schemas/chat.py` – Pydantic models
-- `src/app/core/config.py` – Settings and model definitions
+- `src/app/main.py` – FastAPI app, CORS, TrustedHost, RequestID middlewares, v2 route mounting
+- `src/app/api/v2/` – Route namespaces for version 2 (e.g. `health.py`)
+- `src/app/middleware/` – Custom HTTP middleware handlers (e.g. `request_id.py`)
+- `src/app/services/` – Domain backing services (e.g. `database_service.py`, `redis_service.py`, `qdrant_service.py`)
+- `src/app/schemas/` – Pydantic data schemas (e.g. `health.py`)
+- `src/tests/` – Python unit & integration tests
+- `migrations/` – Alembic migrations repository
+- `Dockerfile.dev` – Hot-reloading Docker container configuration
+- `compose.yaml` – Multi-container orchestration config
+
