@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     app_version: str = Field(default="0.1.0", description="Application version")
 
     tavily_api_key: str = Field(..., description="Tavily API key")
-    
+
     # Job search API (JSearch from RapidAPI - optional, falls back to Tavily if not set)
     jsearch_api_key: str | None = Field(
         default=None, description="JSearch API key from RapidAPI (optional)"
@@ -48,7 +48,30 @@ class Settings(BaseSettings):
     pgvector_enabled: bool = Field(
         default=True, description="Enable pgvector extension for embeddings"
     )
-    
+
+    # Cache & Vector Database configurations
+    redis_url: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis connection URL",
+    )
+    qdrant_url: str = Field(
+        default="http://localhost:6333",
+        description="Qdrant connection URL",
+    )
+
+    @property
+    def async_database_url(self) -> str:
+        """
+        Derive the async database URL using asyncpg from the standard database_url.
+        """
+        url = self.database_url
+
+        if url.startswith("postgresql+psycopg2://"):
+            return url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql://"):
+            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
+
     # CORS configuration
     cors_origins: str = Field(
         default="*",

@@ -1,6 +1,75 @@
+import contextvars
+import datetime
+import json
 import logging
 import sys
 from pathlib import Path
+
+# Context variable to hold request ID for logging tracing
+request_id_var = contextvars.ContextVar("request_id", default=None)
+
+
+class JsonFormatter(logging.Formatter):
+    """
+    Custom JSON formatter for structured application logging.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        log_record = {
+            "timestamp": datetime.datetime.fromtimestamp(
+                record.created, datetime.UTC
+            ).isoformat(),
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "logger": record.name,
+            "filename": record.filename,
+            "lineno": record.lineno,
+        }
+
+        # Capture request_id from context variable or record attributes if present
+        req_id = request_id_var.get()
+        if req_id:
+            log_record["request_id"] = req_id
+        elif hasattr(record, "request_id"):
+            log_record["request_id"] = record.request_id
+
+        # Capture other extra fields provided to logger methods
+        extra_attrs = {
+            k: v
+            for k, v in record.__dict__.items()
+            if k
+            not in {
+                "args",
+                "asctime",
+                "created",
+                "exc_info",
+                "exc_text",
+                "filename",
+                "funcName",
+                "levelname",
+                "levelno",
+                "lineno",
+                "module",
+                "msecs",
+                "msg",
+                "name",
+                "pathname",
+                "process",
+                "processName",
+                "relativeCreated",
+                "stack_info",
+                "thread",
+                "threadName",
+                "request_id",
+            }
+        }
+        if extra_attrs:
+            log_record["extra"] = extra_attrs
+
+        if record.exc_info:
+            log_record["exception"] = self.formatException(record.exc_info)
+
+        return json.dumps(log_record)
 
 
 def setup_logging(
@@ -10,47 +79,40 @@ def setup_logging(
     log_file: str = "app.log",
 ) -> None:
     """
-    Configure application logging.
-
-    Args:
-        level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        format_string: Custom log format string
-        include_file_handler: Whether to add file logging
-        log_file: Path to log file (if file handler is enabled)
+    Configure application logging to use JSON format.
     """
-    if format_string is None:
-        format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    # Keep format_string parameter for backwards compatibility
+    _ = format_string
+    log_level = getattr(logging, level.upper(), logging.INFO)
 
-    # Configure root logger
-    logging.basicConfig(
-        level=getattr(logging, level.upper()),
-        format=format_string,
-        handlers=[logging.StreamHandler(sys.stdout)],
-        force=True,  # Override any existing configuration
-    )
+
+    # Create stream handler with JSON formatter
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(log_level)
+    stream_handler.setFormatter(JsonFormatter())
+
+    handlers = [stream_handler]
 
     # Add file handler if requested
     if include_file_handler:
-        # Create log directory if it doesn't exist
         log_path = Path(log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
 
         file_handler = logging.FileHandler(log_file)
-        file_handler.setLevel(getattr(logging, level.upper()))
-        file_handler.setFormatter(logging.Formatter(format_string))
+        file_handler.setLevel(log_level)
+        file_handler.setFormatter(JsonFormatter())
+        handlers.append(file_handler)
 
-        root_logger = logging.getLogger()
-        root_logger.addHandler(file_handler)
+    # Configure root logger
+    logging.basicConfig(
+        level=log_level,
+        handlers=handlers,
+        force=True,  # Override any existing configuration
+    )
 
 
 def get_logger(name: str) -> logging.Logger:
     """
     Get a logger instance for the given name.
-
-    Args:
-        name: Logger name (usually __name__)
-
-    Returns:
-        Configured logger instance
     """
     return logging.getLogger(name)

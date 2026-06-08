@@ -19,6 +19,9 @@ from app.api.v1.jobs import router as jobs_router
 from app.api.v1.progress import router as progress_router
 from app.api.v1.resume import router as resume_router
 from app.api.v1.sessions import router as sessions_router
+from app.api.v2 import router as api_v2_router
+from app.middleware.request_id import RequestIDMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from app.core.config import settings
 from app.core.logging import get_logger, setup_logging
 from app.infrastructure.database.connection import engine
@@ -57,7 +60,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
 
-# Configure CORS
+# Configure Middlewares
+# 1. Request ID tracing middleware (runs first to trace subsequent middleware & route logs)
+app.add_middleware(RequestIDMiddleware)
+
+# 2. Trusted Host middleware
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["*"],
+)
+
+# 3. Configure CORS
 allow_all_origins = settings.cors_origins.strip() == "*"
 cors_origins = (
     ["*"]
@@ -72,6 +85,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include v2 API Router
+app.include_router(api_v2_router)
+
+# Include v1 API Routers
 app.include_router(index_router)
 app.include_router(chat_router)
 app.include_router(agent_router)
