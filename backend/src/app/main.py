@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
@@ -20,12 +21,11 @@ from app.api.v1.progress import router as progress_router
 from app.api.v1.resume import router as resume_router
 from app.api.v1.sessions import router as sessions_router
 from app.api.v2 import router as api_v2_router
-from app.middleware.request_id import RequestIDMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from app.core.config import settings
 from app.core.logging import get_logger, setup_logging
 from app.infrastructure.database.connection import engine
 from app.infrastructure.database.init_db import init_db
+from app.middleware.request_id import RequestIDMiddleware
 
 # Configure logging
 setup_logging(level="INFO", include_file_handler=True, log_file="logs/app.log")
@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         logger.info("Database connection OK")
-        
+
         # Initialize database tables (creates missing tables)
         try:
             init_db()

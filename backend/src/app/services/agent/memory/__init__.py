@@ -13,14 +13,14 @@ class ConversationMemory:
 
     def __init__(self, max_messages: int = 20) -> None:
         self.max_messages = max_messages
-        self._store: Dict[str, Deque[BaseMessage]] = defaultdict(
+        self._store: dict[str, deque[BaseMessage]] = defaultdict(
             lambda: deque(maxlen=self.max_messages)
         )
 
     def _key(self, user_id: str | None) -> str:
         return user_id or "_anonymous"
 
-    def get(self, user_id: str | None) -> List[BaseMessage]:
+    def get(self, user_id: str | None) -> list[BaseMessage]:
         """Return a copy of the stored history for a user."""
         key = self._key(user_id)
         history = self._store.get(key)

@@ -7,10 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.dependencies.auth import enforce_user_access, get_authenticated_user_id
 from app.infrastructure.database.connection import get_session
+from app.infrastructure.database.models import AnalysisHistory
 from app.infrastructure.database.repositories.analysis_history_repository import (
     AnalysisHistoryRepository,
 )
-from app.infrastructure.database.models import AnalysisHistory
 from app.services.analysis_service import analysis_service
 
 router = APIRouter(prefix="/progress", tags=["progress"])

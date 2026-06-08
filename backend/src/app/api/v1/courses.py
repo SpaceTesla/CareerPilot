@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
 from app.services.agent.tools.course_recommendation_tools import (
     recommend_courses_with_context_tool,
@@ -31,7 +31,7 @@ async def get_course_recommendations(
         # The tool returns recommendations in a "recommendations" key
         recommendations = result.get("recommendations", [])
         user_profile = result.get("user_profile", {})
-        
+
         if isinstance(recommendations, list) and len(recommendations) > 0:
             # Map the recommendations to the expected format
             courses = []
@@ -42,7 +42,7 @@ async def get_course_recommendations(
                     "url": rec.get("url", ""),
                     "provider": rec.get("platform", "Online Platform"),
                 })
-            
+
             return {
                 "courses": courses,
                 "total": len(recommendations),

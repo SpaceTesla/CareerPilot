@@ -2,12 +2,14 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 
 from app.api.dependencies.auth import enforce_user_access, get_authenticated_user_id
 from app.core.logging import get_logger
 from app.infrastructure.database.connection import get_session
-from app.infrastructure.database.repositories.session_repository import SessionRepository
+from app.infrastructure.database.repositories.session_repository import (
+    SessionRepository,
+)
 from app.services.analysis_service import analysis_service
 
 logger = get_logger(__name__)

@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from app.infrastructure.database.models import UserSession, ResumeProfile
+from app.infrastructure.database.models import ResumeProfile, UserSession
 
 
 class SessionRepository:

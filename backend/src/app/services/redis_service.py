@@ -14,6 +14,14 @@ class RedisService:
     """
 
     @staticmethod
+    def get_client():
+        """
+        Returns an async Redis client.
+        """
+        return from_url(settings.redis_url)
+
+
+    @staticmethod
     async def check_health() -> tuple[bool, float]:
         """
         Pings the Redis database and returns latency in milliseconds.

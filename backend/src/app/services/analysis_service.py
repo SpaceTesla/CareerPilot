@@ -38,7 +38,7 @@ class AnalysisService:
             overall_score = min(raw_score, 100)
         else:
             overall_score = min(raw_score * 100, 100)
-        
+
         grade = self._calculate_grade(overall_score)
 
         return {
@@ -57,7 +57,9 @@ class AnalysisService:
             return {"error": "Profile ID is required"}
 
         from app.infrastructure.database.connection import get_session
-        from app.infrastructure.database.repositories.resume_repository import ResumeRepository
+        from app.infrastructure.database.repositories.resume_repository import (
+            ResumeRepository,
+        )
 
         # Get profile to find the user_id
         with get_session() as session:
@@ -71,7 +73,7 @@ class AnalysisService:
         # Note: This assumes the tools will work with this user_id
         # For a more accurate per-profile analysis, tools would need to be updated
         # to accept profile_id directly. For now, we'll use a simplified approach.
-        
+
         from app.services.agent.tools.analysis_tools import (
             analyze_resume_strengths_for_profile_tool,
         )
@@ -86,7 +88,7 @@ class AnalysisService:
                 overall_score = min(raw_score, 100)
             else:
                 overall_score = min(raw_score * 100, 100)
-            
+
             grade = self._calculate_grade(overall_score)
 
             return {
@@ -179,7 +181,10 @@ class AnalysisService:
             return {"error": "User ID is required"}
 
         from app.services.agent.tools.resume_tools import get_skills_tool
-        from app.services.role_embeddings import compute_semantic_gap_score, get_role_requirements
+        from app.services.role_embeddings import (
+            compute_semantic_gap_score,
+            get_role_requirements,
+        )
 
         skills_data = await get_skills_tool(user_id)
         if "error" in skills_data:
@@ -203,7 +208,9 @@ class AnalysisService:
         resume_embedding: list[float] | None = None
         try:
             from app.infrastructure.database.connection import get_session
-            from app.infrastructure.database.repositories.resume_repository import ResumeRepository
+            from app.infrastructure.database.repositories.resume_repository import (
+                ResumeRepository,
+            )
 
             with get_session() as session:
                 repo = ResumeRepository(session)

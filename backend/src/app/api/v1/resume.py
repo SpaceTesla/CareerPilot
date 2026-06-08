@@ -5,17 +5,27 @@ import uuid
 from pathlib import Path as PathLib
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    UploadFile,
+)
 from fastapi.params import Path
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import get_authenticated_user_id
+
 from ...infrastructure.database.connection import get_session
 from ...infrastructure.database.models import ResumeProcessingJob, ResumeProfile, User
 from ...infrastructure.database.repositories.conversation_repository import (
     ConversationRepository,
 )
-from ...infrastructure.database.repositories.resume_job_repository import ResumeJobRepository
+from ...infrastructure.database.repositories.resume_job_repository import (
+    ResumeJobRepository,
+)
 from ...infrastructure.database.repositories.resume_repository import (
     ResumeRepository,
 )

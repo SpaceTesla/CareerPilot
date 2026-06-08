@@ -17,7 +17,6 @@ embeddings are available, falling back to the exact approach otherwise.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 from app.core.logging import get_logger
 from app.infrastructure.rag.embeddings.service import embedding_service

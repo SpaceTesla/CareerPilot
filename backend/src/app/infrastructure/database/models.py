@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -26,6 +26,8 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=now_utc, onupdate=now_utc
@@ -33,6 +35,15 @@ class User(Base):
 
     profiles: Mapped[list[ResumeProfile]] = relationship(
         "ResumeProfile", back_populates="user"
+    )
+    preferences: Mapped[UserPreferences | None] = relationship(
+        "UserPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
+    goals: Mapped[CareerGoals | None] = relationship(
+        "CareerGoals", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
+    refresh_tokens: Mapped[list[RefreshToken]] = relationship(
+        "RefreshToken", back_populates="user", cascade="all, delete-orphan"
     )
 
 
@@ -226,3 +237,62 @@ class RecommendationFeedback(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=now_utc, onupdate=now_utc
     )
+
+
+class RefreshToken(Base):
+    """Tracks refresh tokens for JWT session rotation."""
+
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    is_revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+    user: Mapped[User] = relationship("User", back_populates="refresh_tokens")
+
+
+class UserPreferences(Base):
+    """User preferences for notifications and application settings."""
+
+    __tablename__ = "user_preferences"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True, nullable=False
+    )
+    job_search_status: Mapped[str] = mapped_column(String(50), nullable=False)  # ACTIVE, PASSIVE, CLOSED
+    weekly_digest_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    email_notifications: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    user: Mapped[User] = relationship("User", back_populates="preferences")
+
+
+class CareerGoals(Base):
+    """User target career goals configuration."""
+
+    __tablename__ = "career_goals"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True, nullable=False
+    )
+    target_role: Mapped[str] = mapped_column(String(255), nullable=False)
+    target_compensation_min: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    target_compensation_max: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    target_companies: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    timeline_months: Mapped[int] = mapped_column(nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    user: Mapped[User] = relationship("User", back_populates="goals")

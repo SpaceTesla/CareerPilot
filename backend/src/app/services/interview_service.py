@@ -12,7 +12,6 @@ from app.core.config import settings
 from app.infrastructure.database.connection import get_session
 from app.infrastructure.database.repositories.resume_repository import ResumeRepository
 from app.services.agent.tools.resume_tools import (
-    get_achievements_tool,
     get_education_tool,
     get_experience_tool,
     get_projects_tool,
@@ -265,7 +264,7 @@ Format as JSON with keys: strengths, improvements, suggestions, scores, sample_a
 
         try:
             feedback_text = await chain.ainvoke({})
-            
+
             # Try to parse as JSON, fallback to text
             import json
             try:

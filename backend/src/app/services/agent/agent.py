@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+from typing import Any
 
 from langchain_core.messages import (
     AIMessage,
@@ -50,31 +50,31 @@ async def agent_get_skills(user_id: str) -> dict[str, Any]:
 
 
 @tool("get_experience", return_direct=False)
-async def agent_get_experience(user_id: str) -> List[dict[str, Any]]:
+async def agent_get_experience(user_id: str) -> list[dict[str, Any]]:
     """Return the work experience entries for the user with roles, companies, and bullet points."""
     return await get_experience_tool(user_id=user_id)
 
 
 @tool("get_education", return_direct=False)
-async def agent_get_education(user_id: str) -> List[dict[str, Any]]:
+async def agent_get_education(user_id: str) -> list[dict[str, Any]]:
     """Return the education history (degrees, schools, GPA) for the user."""
     return await get_education_tool(user_id=user_id)
 
 
 @tool("get_projects", return_direct=False)
-async def agent_get_projects(user_id: str) -> List[dict[str, Any]]:
+async def agent_get_projects(user_id: str) -> list[dict[str, Any]]:
     """Return notable project entries including tech stack and impact statements."""
     return await get_projects_tool(user_id=user_id)
 
 
 @tool("get_achievements", return_direct=False)
-async def agent_get_achievements(user_id: str) -> List[dict[str, Any]]:
+async def agent_get_achievements(user_id: str) -> list[dict[str, Any]]:
     """Fetch awards or achievements listed in the resume."""
     return await get_achievements_tool(user_id=user_id)
 
 
 @tool("get_co_curricular", return_direct=False)
-async def agent_get_co_curricular(user_id: str) -> List[dict[str, Any]]:
+async def agent_get_co_curricular(user_id: str) -> list[dict[str, Any]]:
     """Fetch co-curricular or extracurricular activities for the user."""
     return await get_co_curricular_tool(user_id=user_id)
 
@@ -156,7 +156,7 @@ class AgentService:
             return json.dumps({"result": str(result)})
 
     async def _invoke_tool(
-        self, tool_name: str | None, args: Dict[str, Any]
+        self, tool_name: str | None, args: dict[str, Any]
     ) -> Any:
         if not tool_name:
             return {"error": "Tool name missing in model response."}
@@ -196,7 +196,7 @@ class AgentService:
             self.memory.append(user_id, user_message)
 
             actions_taken: list[str] = []
-            collected_data: Dict[str, list[Any]] = {}
+            collected_data: dict[str, list[Any]] = {}
 
             for iteration in range(self.MAX_ITERATIONS):
                 ai_response: AIMessage = await self.tool_enabled_llm.ainvoke(

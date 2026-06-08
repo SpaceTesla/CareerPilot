@@ -4,8 +4,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.services.job_matching_service import job_matching_service
 from app.services.ats_service import ats_service
+from app.services.job_matching_service import job_matching_service
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 

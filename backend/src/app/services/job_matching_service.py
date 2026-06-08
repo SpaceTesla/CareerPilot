@@ -71,21 +71,21 @@ class JobMatchingService:
 
                 jobs = []
                 results = data.get("data", [])
-                
+
                 for job in results[:limit]:
                     # Filter out non-job results (guides, articles, etc.)
                     job_title = job.get("job_title", "").lower()
                     job_url = job.get("job_apply_link") or job.get("job_google_link", "")
-                    
+
                     # Skip if it's clearly not a job posting
                     skip_keywords = ["guide", "how to", "career path", "salary", "article", "blog"]
                     if any(keyword in job_title for keyword in skip_keywords):
                         continue
-                    
+
                     # Only include if we have a valid application URL
                     if not job_url or "google.com/search" in job_url:
                         continue
-                    
+
                     jobs.append({
                         "title": job.get("job_title", "Job Opening"),
                         "company": job.get("employer_name", "Company"),
@@ -150,14 +150,14 @@ class JobMatchingService:
             for result in response.get("results", [])[:limit * 2]:
                 title = result.get("title", "")
                 url = result.get("url", "")
-                
+
                 # Filter for actual job postings
                 if not url or not any(
                     domain in url.lower()
                     for domain in ["linkedin.com/jobs", "indeed.com", "naukri.com", "glassdoor.com"]
                 ):
                     continue
-                
+
                 # Skip guides and articles
                 skip_keywords = ["guide", "how to", "career path", "salary guide"]
                 if any(keyword in title.lower() for keyword in skip_keywords):
@@ -169,7 +169,7 @@ class JobMatchingService:
                     "description": result.get("content", "")[:200] + "...",
                     "source": self._extract_source_from_url(url),
                 })
-                
+
                 if len(jobs) >= limit:
                     break
 
@@ -261,12 +261,12 @@ class JobMatchingService:
         skills_dict = profile.get("skills", {})
         all_skills.extend(skills_dict.get("languages", [])[:3])
         all_skills.extend(skills_dict.get("frameworks", [])[:2])
-        
+
         # Build search query
         query = current_focus
         if all_skills:
             query += f" {' '.join(all_skills[:2])}"
-        
+
         location = profile.get("location")
 
         # Try JSearch API first (real job postings); run Indeed guarantee in parallel
@@ -317,7 +317,10 @@ class JobMatchingService:
         if not profile:
             return {"error": "No profile found"}
 
-        from app.services.agent.tools.resume_tools import get_experience_tool, get_skills_tool
+        from app.services.agent.tools.resume_tools import (
+            get_experience_tool,
+            get_skills_tool,
+        )
 
         skills_data = await get_skills_tool(user_id)
         experience_data = await get_experience_tool(user_id)

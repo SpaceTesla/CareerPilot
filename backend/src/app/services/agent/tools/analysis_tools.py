@@ -112,7 +112,7 @@ async def analyze_resume_strengths_tool(user_id: str | None) -> dict[str, Any]:
             edu_score * 0.10 +
             summary_score * 0.05
         )
-        
+
         # Ensure minimum score of 0.15 (15%) for any resume with data
         if any([
             contact_count > 0,
@@ -366,7 +366,7 @@ async def analyze_resume_strengths_for_profile_tool(profile_id: str | None) -> d
             edu_score * 0.10 +
             summary_score * 0.05
         )
-        
+
         # Ensure minimum score
         if any([contact_count > 0, total_skills > 0, len(experience) > 0, len(projects) > 0, len(education) > 0]):
             analysis["overall_score"] = max(analysis["overall_score"], 0.15)

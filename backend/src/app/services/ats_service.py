@@ -174,14 +174,14 @@ Respond in JSON format:
             # Parse LLM response
             import json
             import re
-            
+
             content = response.content
             # Extract JSON from response
             json_match = re.search(r'\{[\s\S]*\}', str(content))
             if json_match:
                 result = json.loads(json_match.group())
                 return result
-            
+
             return {
                 "semantic_score": 60,
                 "keyword_suggestions": [],
@@ -195,7 +195,7 @@ Respond in JSON format:
                 "semantic_score": 55,
                 "keyword_suggestions": [
                     "Agile/Scrum methodology",
-                    "Cross-functional collaboration", 
+                    "Cross-functional collaboration",
                     "Performance optimization",
                     "System design",
                     "CI/CD pipelines"

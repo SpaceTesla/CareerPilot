@@ -11,8 +11,9 @@ import asyncio
 import base64
 import os
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Callable
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import urlparse
 
 # Point Playwright at the browsers installed in the container.
@@ -21,7 +22,9 @@ os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/ms-playwright")
 
 from app.core.logging import get_logger
 from app.infrastructure.database.connection import get_session
-from app.infrastructure.database.repositories.portal_session_repository import PortalSessionRepository
+from app.infrastructure.database.repositories.portal_session_repository import (
+    PortalSessionRepository,
+)
 from app.infrastructure.database.repositories.resume_repository import ResumeRepository
 
 logger = get_logger(__name__)
@@ -203,7 +206,7 @@ async def _llm_vision_step(
     import json  # noqa: PLC0415
 
     try:
-        from langchain_core.messages import HumanMessage          # noqa: PLC0415
+        from langchain_core.messages import HumanMessage  # noqa: PLC0415
         from langchain_google_genai import ChatGoogleGenerativeAI  # noqa: PLC0415
     except ImportError:
         logger.warning("langchain_google_genai not available; skipping LLM vision step")
@@ -548,7 +551,7 @@ def _browser_cookies_to_storage_state(
         elif isinstance(raw_exp, str):
             # ISO date string e.g. "2026-12-31T00:00:00.000Z"
             try:
-                from datetime import datetime, timezone
+                from datetime import datetime
                 dt = datetime.fromisoformat(raw_exp.replace("Z", "+00:00"))
                 expires = dt.timestamp()
             except Exception:
@@ -805,12 +808,12 @@ class AutomationService:
             "fields_filled": [],
             "result_status": None, # filled | no_fields_found | error
             "error": None,
-            "started_at": datetime.now(timezone.utc).isoformat(),
+            "started_at": datetime.now(UTC).isoformat(),
             "finished_at": None,
         }
         # Prune finished tasks if registry grows large
         if len(_tasks) > 200:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             stale = [
                 tid for tid, t in list(_tasks.items())
                 if t["status"] in ("done", "error")
@@ -853,7 +856,7 @@ class AutomationService:
                 "step": step,
                 "message": msg,
                 "screenshot": screenshot,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             })
 
         portal = task["portal"]
@@ -861,7 +864,7 @@ class AutomationService:
             task["status"] = "error"
             task["result_status"] = "unsupported"
             task["error"] = "Unsupported portal"
-            task["finished_at"] = datetime.now(timezone.utc).isoformat()
+            task["finished_at"] = datetime.now(UTC).isoformat()
             _snap("error", "This job portal is not supported. Supported: LinkedIn, Indeed, Naukri, Glassdoor.")
             return
 
@@ -900,7 +903,7 @@ class AutomationService:
             task["status"] = "error"
             task["result_status"] = "error"
             task["error"] = "Playwright not installed"
-            task["finished_at"] = datetime.now(timezone.utc).isoformat()
+            task["finished_at"] = datetime.now(UTC).isoformat()
             _snap("error", "Playwright is not installed in the container.")
             return
 
@@ -941,11 +944,11 @@ class AutomationService:
 
                 # Multi-step apply loop: listing → form page(s) → review
                 MAX_STEPS = 14
-                loop_deadline = datetime.now(timezone.utc).timestamp() + 300  # 5-min hard cap
+                loop_deadline = datetime.now(UTC).timestamp() + 300  # 5-min hard cap
                 apply_clicked = False  # guard: only click the initial Apply button once
                 apply_wait_retries = 0  # count consecutive "waiting for form" loops
                 for step_num in range(MAX_STEPS):
-                    if datetime.now(timezone.utc).timestamp() > loop_deadline:
+                    if datetime.now(UTC).timestamp() > loop_deadline:
                         _snap("error", "Auto-fill timed out after 3 minutes. Try again or fill manually.")
                         task["result_status"] = "error"
                         task["error"] = "timeout"
@@ -993,7 +996,7 @@ class AutomationService:
                         # Wait up to 10 minutes for user to confirm or cancel
                         try:
                             await asyncio.wait_for(confirm_event.wait(), timeout=600)
-                        except asyncio.TimeoutError:
+                        except TimeoutError:
                             _snap("done", "Confirmation timed out — application not submitted.", None)
                             task["result_status"] = "cancelled"
                             break
@@ -1188,7 +1191,7 @@ class AutomationService:
             _snap("error", f"Automation failed: {e}")
 
         task["status"] = "done" if task["result_status"] not in ("error",) else "error"
-        task["finished_at"] = datetime.now(timezone.utc).isoformat()
+        task["finished_at"] = datetime.now(UTC).isoformat()
 
     def confirm_fill_task(self, task_id: str, confirmed: bool) -> bool:
         """

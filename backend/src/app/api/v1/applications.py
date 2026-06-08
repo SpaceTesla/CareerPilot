@@ -7,7 +7,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 
 from app.api.dependencies.auth import enforce_user_access, get_authenticated_user_id
 from app.infrastructure.database.connection import get_session
