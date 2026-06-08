@@ -9,6 +9,14 @@ from httpx import ASGITransport, AsyncClient
 from app.core.config import settings
 from app.main import app
 from app.services.auth_service import AuthService
+from app.services.database_service import async_engine
+
+@pytest.fixture(scope="module", autouse=True)
+async def cleanup_db_engine():
+    await async_engine.dispose()
+    yield
+    await async_engine.dispose()
+
 
 # 1. Unit Tests
 

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Numeric, String, Text, Date
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -44,6 +44,9 @@ class User(Base):
     )
     refresh_tokens: Mapped[list[RefreshToken]] = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
+    )
+    profile: Mapped[CareerProfile | None] = relationship(
+        "CareerProfile", back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
 
 
@@ -296,3 +299,151 @@ class CareerGoals(Base):
     )
 
     user: Mapped[User] = relationship("User", back_populates="goals")
+
+
+class CareerProfile(Base):
+    __tablename__ = "career_profiles"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True, nullable=False
+    )
+    headline: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    location: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    current_salary: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    user: Mapped[User] = relationship("User", back_populates="profile")
+    skills: Mapped[list[Skill]] = relationship(
+        "Skill", back_populates="profile", cascade="all, delete-orphan"
+    )
+    experiences: Mapped[list[Experience]] = relationship(
+        "Experience", back_populates="profile", cascade="all, delete-orphan"
+    )
+    education: Mapped[list[Education]] = relationship(
+        "Education", back_populates="profile", cascade="all, delete-orphan"
+    )
+    projects: Mapped[list[Project]] = relationship(
+        "Project", back_populates="profile", cascade="all, delete-orphan"
+    )
+    versions: Mapped[list[ProfileVersion]] = relationship(
+        "ProfileVersion", back_populates="profile", cascade="all, delete-orphan"
+    )
+    resumes: Mapped[list[UploadedResume]] = relationship(
+        "UploadedResume", back_populates="profile", cascade="all, delete-orphan"
+    )
+
+
+class ProfileVersion(Base):
+    __tablename__ = "profile_versions"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("career_profiles.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    version_number: Mapped[int] = mapped_column(nullable=False)
+    snapshot_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+    profile: Mapped[CareerProfile] = relationship("CareerProfile", back_populates="versions")
+
+
+class Skill(Base):
+    __tablename__ = "skills"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("career_profiles.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    skill_name: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
+    years_experience: Mapped[float] = mapped_column(Numeric(4, 1), nullable=False)
+    proficiency: Mapped[str] = mapped_column(String(50), nullable=False)  # NOVICE, INTERMEDIATE, ADVANCED, EXPERT
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    profile: Mapped[CareerProfile] = relationship("CareerProfile", back_populates="skills")
+
+
+class Experience(Base):
+    __tablename__ = "experiences"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("career_profiles.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    company_name: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    job_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)  # DATE type
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    is_current: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    profile: Mapped[CareerProfile] = relationship("CareerProfile", back_populates="experiences")
+
+
+class Education(Base):
+    __tablename__ = "education"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("career_profiles.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    institution: Mapped[str] = mapped_column(String(255), nullable=False)
+    degree: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    field_of_study: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    profile: Mapped[CareerProfile] = relationship("CareerProfile", back_populates="education")
+
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("career_profiles.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    role_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    profile: Mapped[CareerProfile] = relationship("CareerProfile", back_populates="projects")
+
+
+class UploadedResume(Base):
+    __tablename__ = "uploaded_resumes"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("career_profiles.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_size: Mapped[int] = mapped_column(nullable=False)
+    content_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    raw_text: Mapped[str] = mapped_column(Text, nullable=False)
+    parsed_payload: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    confidence_score: Mapped[float | None] = mapped_column(Numeric(3, 2), nullable=True)
+    is_synced: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+    profile: Mapped[CareerProfile] = relationship("CareerProfile", back_populates="resumes")
