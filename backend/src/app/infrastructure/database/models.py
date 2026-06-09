@@ -447,3 +447,252 @@ class UploadedResume(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
 
     profile: Mapped[CareerProfile] = relationship("CareerProfile", back_populates="resumes")
+
+
+class Company(Base):
+    __tablename__ = "companies"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    website: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    sector: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    size_range: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    postings: Mapped[list[JobPosting]] = relationship("JobPosting", back_populates="company")
+
+
+class JobPosting(Base):
+    __tablename__ = "job_postings"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    company_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("companies.id", ondelete="RESTRICT"), index=True, nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    raw_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    location: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    url: Mapped[str] = mapped_column(String(1024), index=True, nullable=False)
+    compensation_min: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    compensation_max: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    currency: Mapped[str] = mapped_column(String(10), default="USD", nullable=False)
+    source: Mapped[str] = mapped_column(String(100), nullable=False)
+    source_id: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    post_date: Mapped[date] = mapped_column(Date, index=True, nullable=False)
+    expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True, nullable=False)
+    deduplicated_to_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_postings.id", ondelete="SET NULL"), index=True, nullable=True
+    )
+    merged_into_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_postings.id", ondelete="SET NULL"), index=True, nullable=True
+    )
+    dedupe_fingerprint: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    company: Mapped[Company] = relationship("Company", back_populates="postings")
+    skills: Mapped[list[JobPostingSkill]] = relationship("JobPostingSkill", back_populates="job_posting")
+
+
+class NormalizedSkill(Base):
+    __tablename__ = "normalized_skills"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    aliases: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class JobPostingSkill(Base):
+    __tablename__ = "job_postings_skills"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    job_posting_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_postings.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    skill_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("normalized_skills.id", ondelete="RESTRICT"), index=True, nullable=False
+    )
+    raw_mention: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    extraction_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    confidence_score: Mapped[float | None] = mapped_column(Numeric(4, 3), nullable=True)
+    context_sentence: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+    job_posting: Mapped[JobPosting] = relationship("JobPosting", back_populates="skills")
+
+
+class IngestionAuditLog(Base):
+    __tablename__ = "ingestion_audit_logs"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    source: Mapped[str] = mapped_column(String(100), nullable=False)
+    job_count_attempted: Mapped[int] = mapped_column(nullable=False)
+    job_count_inserted: Mapped[int] = mapped_column(nullable=False)
+    job_count_duplicated: Mapped[int] = mapped_column(nullable=False)
+    job_count_failed: Mapped[int] = mapped_column(nullable=False)
+    log_details: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class JobSource(Base):
+    __tablename__ = "job_sources"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    source_key: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    rate_limit_limit: Mapped[int | None] = mapped_column(nullable=True)
+    rate_limit_remaining: Mapped[int | None] = mapped_column(nullable=True)
+    rate_limit_reset_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    error_count_24h: Mapped[int] = mapped_column(default=0, nullable=False)
+    last_run_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+
+class JobIngestionRun(Base):
+    __tablename__ = "job_ingestion_runs"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    source_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_sources.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(50), nullable=False)
+    items_scraped: Mapped[int] = mapped_column(default=0, nullable=False)
+    items_inserted: Mapped[int] = mapped_column(default=0, nullable=False)
+    items_failed: Mapped[int] = mapped_column(default=0, nullable=False)
+    error_log: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class RawJobPosting(Base):
+    __tablename__ = "raw_job_postings"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    ingestion_run_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_ingestion_runs.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    source_key: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
+    external_id: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    company_name: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    location_raw: Mapped[str] = mapped_column(String(255), nullable=False)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    salary_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    raw_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class JobDuplicate(Base):
+    __tablename__ = "job_duplicates"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    primary_job_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_postings.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    duplicate_job_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_postings.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    confidence_score: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
+    title_similarity: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
+    company_similarity: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
+    description_similarity: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="PENDING_REVIEW", index=True, nullable=False)
+    reviewed_by: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class DedupeAuditLog(Base):
+    __tablename__ = "dedupe_audit_logs"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    primary_job_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_postings.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    merged_job_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    merge_details: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class SkillTrendDaily(Base):
+    __tablename__ = "skill_trends_daily"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    skill_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("normalized_skills.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    snapshot_date: Mapped[date] = mapped_column(Date, index=True, nullable=False)
+    posting_count: Mapped[int] = mapped_column(nullable=False)
+    total_postings_count: Mapped[int] = mapped_column(nullable=False)
+    frequency: Mapped[float] = mapped_column(Numeric(6, 5), nullable=False)
+
+
+class SkillRelationship(Base):
+    __tablename__ = "skill_relationships"
+
+    parent_skill_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("normalized_skills.id", ondelete="CASCADE"), primary_key=True
+    )
+    child_skill_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("normalized_skills.id", ondelete="CASCADE"), primary_key=True
+    )
+    relationship_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    confidence_score: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
+
+
+class CompensationRecord(Base):
+    __tablename__ = "compensation_records"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    job_posting_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_postings.id", ondelete="CASCADE"), nullable=True
+    )
+    source_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    min_salary: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    max_salary: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    payment_interval: Mapped[str] = mapped_column(String(50), nullable=False)
+    computed_annual_min: Mapped[float] = mapped_column(Numeric(12, 2), index=True, nullable=False)
+    computed_annual_max: Mapped[float] = mapped_column(Numeric(12, 2), index=True, nullable=False)
+    equity_min: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    equity_max: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    location_normalized: Mapped[str] = mapped_column(String(150), index=True, nullable=False)
+    col_tier: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class CompensationBenchmark(Base):
+    __tablename__ = "compensation_benchmarks"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    role_type: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
+    location_normalized: Mapped[str] = mapped_column(String(150), index=True, nullable=False)
+    skill_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("normalized_skills.id", ondelete="CASCADE"), index=True, nullable=True
+    )
+    p25_salary: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    p50_salary: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    p75_salary: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    sample_size: Mapped[int] = mapped_column(nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
