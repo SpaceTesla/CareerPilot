@@ -13,7 +13,7 @@ const STALE_TIME = 2 * 60 * 1000; // 2 minutes
 export function usePendingApprovals(userId: string | null) {
   return useQuery<AgentApprovalRequest[]>({
     queryKey: ["agent", "approvals", "pending", userId],
-    queryFn: () => apiRequest<AgentApprovalRequest[]>("/approvals/pending"),
+    queryFn: () => apiRequest<AgentApprovalRequest[]>("/api/v2/approvals/pending"),
     enabled: !!userId,
     refetchInterval: 10000, // Poll for approvals every 10 seconds
   });
@@ -31,7 +31,7 @@ export function useSubmitApprovalAction(userId: string | null) {
 
   return useMutation<{ status: string; message: string }, Error, ApprovalActionPayload>({
     mutationFn: ({ approvalId, action, editedPayload }) =>
-      apiRequest<{ status: string; message: string }>(`/approvals/${approvalId}/action`, {
+      apiRequest<{ status: string; message: string }>(`/api/v2/approvals/${approvalId}/action`, {
         method: "POST",
         body: JSON.stringify({
           action,
@@ -48,7 +48,7 @@ export function useSubmitApprovalAction(userId: string | null) {
 export function useSupervisorDecisions(threadId: string | null) {
   return useQuery<{ thread_id: string; decisions: AgentDecisionLog[] }>({
     queryKey: ["agent", "supervisor", "decisions", threadId],
-    queryFn: () => apiRequest<{ thread_id: string; decisions: AgentDecisionLog[] }>(`/supervisor/sessions/${threadId}/decisions`),
+    queryFn: () => apiRequest<{ thread_id: string; decisions: AgentDecisionLog[] }>(`/api/v2/supervisor/sessions/${threadId}/decisions`),
     enabled: !!threadId,
   });
 }
@@ -64,7 +64,7 @@ interface SupervisorApprovePayload {
 export function useSupervisorApprove() {
   return useMutation<{ status: string; next_node: string; message: string; run_id: string }, Error, SupervisorApprovePayload>({
     mutationFn: (payload) =>
-      apiRequest<{ status: string; next_node: string; message: string; run_id: string }>("/supervisor/approve", {
+      apiRequest<{ status: string; next_node: string; message: string; run_id: string }>("/api/v2/supervisor/approve", {
         method: "POST",
         body: JSON.stringify({
           thread_id: payload.threadId,
@@ -86,7 +86,7 @@ interface RunAgentPayload {
 export function useStartAgentRun() {
   return useMutation<{ run_id: string; thread_id: string; status: string; message: string }, Error, RunAgentPayload>({
     mutationFn: (payload) =>
-      apiRequest<{ run_id: string; thread_id: string; status: string; message: string }>("/agents/run", {
+      apiRequest<{ run_id: string; thread_id: string; status: string; message: string }>("/api/v2/agents/run", {
         method: "POST",
         body: JSON.stringify({
           thread_id: payload.threadId,
@@ -101,7 +101,7 @@ export function useStartAgentRun() {
 export function useAgentSessionState(threadId: string | null) {
   return useQuery<any>({
     queryKey: ["agent", "session", "state", threadId],
-    queryFn: () => apiRequest<any>(`/agents/session/${threadId}/state`),
+    queryFn: () => apiRequest<any>(`/api/v2/agents/session/${threadId}/state`),
     enabled: !!threadId,
     refetchInterval: (query) => {
       const state = query.state.data;
@@ -117,7 +117,7 @@ export function useAgentSessionState(threadId: string | null) {
 export function useApplicationExecutionLogs(applicationId: string | null) {
   return useQuery<ApplicationExecutionLogs>({
     queryKey: ["applications", "logs", applicationId],
-    queryFn: () => apiRequest<ApplicationExecutionLogs>(`/applications/${applicationId}/logs`),
+    queryFn: () => apiRequest<ApplicationExecutionLogs>(`/api/v2/applications/${applicationId}/logs`),
     enabled: !!applicationId,
     refetchInterval: (query) => {
       // If there are running workflows, poll every 5s
@@ -134,7 +134,7 @@ export function useApplicationExecutionLogs(applicationId: string | null) {
 export function useWorkflowStatus(workflowId: string | null) {
   return useQuery<WorkflowExecutionLog>({
     queryKey: ["workflows", "status", workflowId],
-    queryFn: () => apiRequest<WorkflowExecutionLog>(`/workflows/executions/${workflowId}`),
+    queryFn: () => apiRequest<WorkflowExecutionLog>(`/api/v2/workflows/executions/${workflowId}`),
     enabled: !!workflowId,
     refetchInterval: (query) => {
       const data = query.state.data;
@@ -152,7 +152,7 @@ export function useCancelWorkflow() {
 
   return useMutation<{ workflow_id: string; message: string }, Error, string>({
     mutationFn: (workflowId) =>
-      apiRequest<{ workflow_id: string; message: string }>(`/workflows/executions/${workflowId}/cancel`, {
+      apiRequest<{ workflow_id: string; message: string }>(`/api/v2/workflows/executions/${workflowId}/cancel`, {
         method: "POST",
       }),
     onSuccess: (data) => {

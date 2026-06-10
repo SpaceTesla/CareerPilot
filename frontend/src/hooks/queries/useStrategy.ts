@@ -18,7 +18,7 @@ export function useUserDigests(userId: string | null) {
 
   const query = useQuery({
     queryKey,
-    queryFn: () => apiRequest<{ digests: UserDigestBrief[] }>("/strategy/digests"),
+    queryFn: () => apiRequest<{ digests: UserDigestBrief[] }>("/api/v2/strategy/digests"),
     enabled: !!userId,
     staleTime: STALE_TIME,
     gcTime: CACHE_TIME,
@@ -40,7 +40,7 @@ export function useUserDigestDetail(digestId: string | null) {
 
   const query = useQuery({
     queryKey,
-    queryFn: () => apiRequest<UserDigestDetail>(`/strategy/digests/${digestId}`),
+    queryFn: () => apiRequest<UserDigestDetail>(`/api/v2/strategy/digests/${digestId}`),
     enabled: !!digestId,
     staleTime: STALE_TIME,
     gcTime: CACHE_TIME,
@@ -62,7 +62,7 @@ export function useStrategyReviews(userId: string | null) {
 
   const query = useQuery({
     queryKey,
-    queryFn: () => apiRequest<{ reviews: StrategyReviewBrief[] }>("/strategy/reviews"),
+    queryFn: () => apiRequest<{ reviews: StrategyReviewBrief[] }>("/api/v2/strategy/reviews"),
     enabled: !!userId,
     staleTime: STALE_TIME,
     gcTime: CACHE_TIME,
@@ -84,7 +84,7 @@ export function useStrategyReviewDetail(reviewId: string | null) {
 
   const query = useQuery({
     queryKey,
-    queryFn: () => apiRequest<StrategyReviewDetail>(`/strategy/reviews/${reviewId}`),
+    queryFn: () => apiRequest<StrategyReviewDetail>(`/api/v2/strategy/reviews/${reviewId}`),
     enabled: !!reviewId,
     staleTime: STALE_TIME,
     gcTime: CACHE_TIME,
@@ -114,7 +114,7 @@ export function useCompleteReview() {
       acceptActionItems: boolean;
     }) =>
       apiRequest<{ id: string; status: string; completed_at: string }>(
-        `/strategy/reviews/${reviewId}/complete`,
+        `/api/v2/strategy/reviews/${reviewId}/complete`,
         {
           method: "POST",
           body: JSON.stringify({
@@ -146,7 +146,7 @@ export function useUpdateActionItem() {
       status: "TODO" | "COMPLETED" | "CANCELLED";
     }) =>
       apiRequest<{ id: string; status: string; completed_at: string | null }>(
-        `/strategy/reviews/action-items/${itemId}`,
+        `/api/v2/strategy/reviews/action-items/${itemId}`,
         {
           method: "PATCH",
           body: JSON.stringify({ status }),
@@ -169,7 +169,7 @@ export function useUpdatePreferences() {
       digest_delivery_day?: number;
       digest_delivery_hour?: number;
     }) =>
-      apiRequest<unknown>("/profile/preferences", {
+      apiRequest<unknown>("/api/v2/profile/preferences", {
         method: "PATCH",
         body: JSON.stringify(payload),
       }),

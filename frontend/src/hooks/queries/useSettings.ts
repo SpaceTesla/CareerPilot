@@ -43,7 +43,7 @@ export interface CareerGoalsUpdate {
 export function usePreferences(userId: string | null) {
   return useQuery<UserPreferences>({
     queryKey: ["identity", "preferences", userId],
-    queryFn: () => apiRequest<UserPreferences>("/identity/preferences"),
+    queryFn: () => apiRequest<UserPreferences>("/api/v2/identity/preferences"),
     enabled: !!userId,
     staleTime: STALE_TIME,
   });
@@ -55,7 +55,7 @@ export function useUpdatePreferences(userId: string | null) {
 
   return useMutation<UserPreferences, Error, UserPreferencesUpdate>({
     mutationFn: (payload) =>
-      apiRequest<UserPreferences>("/identity/preferences", {
+      apiRequest<UserPreferences>("/api/v2/identity/preferences", {
         method: "PUT",
         body: JSON.stringify(payload),
       }),
@@ -69,7 +69,7 @@ export function useUpdatePreferences(userId: string | null) {
 export function useGoals(userId: string | null) {
   return useQuery<CareerGoals>({
     queryKey: ["identity", "goals", userId],
-    queryFn: () => apiRequest<CareerGoals>("/identity/goals"),
+    queryFn: () => apiRequest<CareerGoals>("/api/v2/identity/goals"),
     enabled: !!userId,
     staleTime: STALE_TIME,
   });
@@ -81,7 +81,7 @@ export function useUpdateGoals(userId: string | null) {
 
   return useMutation<CareerGoals, Error, CareerGoalsUpdate>({
     mutationFn: (payload) =>
-      apiRequest<CareerGoals>("/identity/goals", {
+      apiRequest<CareerGoals>("/api/v2/identity/goals", {
         method: "PUT",
         body: JSON.stringify(payload),
       }),

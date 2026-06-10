@@ -20,7 +20,7 @@ export function useTriggerEvalRun() {
 
   return useMutation<{ eval_run_id: string; status: string; message: string }, Error, TriggerEvalPayload>({
     mutationFn: (payload) =>
-      apiRequest<{ eval_run_id: string; status: string; message: string }>("/eval/run", {
+      apiRequest<{ eval_run_id: string; status: string; message: string }>("/api/v2/eval/run", {
         method: "POST",
         body: JSON.stringify({
           component_name: payload.componentName,
@@ -38,7 +38,7 @@ export function useTriggerEvalRun() {
 export function useEvalReport(runId: string | null) {
   return useQuery<EvaluationReport>({
     queryKey: ["calibration", "eval", "report", runId],
-    queryFn: () => apiRequest<EvaluationReport>(`/eval/runs/${runId}/report`),
+    queryFn: () => apiRequest<EvaluationReport>(`/api/v2/eval/runs/${runId}/report`),
     enabled: !!runId,
   });
 }
@@ -52,7 +52,7 @@ interface TrainModelPayload {
 export function useRetrainCalibrationModel() {
   return useMutation<{ task_id: string; status: string; message: string }, Error, TrainModelPayload>({
     mutationFn: (payload) =>
-      apiRequest<{ task_id: string; status: string; message: string }>("/calibration/train", {
+      apiRequest<{ task_id: string; status: string; message: string }>("/api/v2/calibration/train", {
         method: "POST",
         body: JSON.stringify({
           min_samples_required: payload?.minSamplesRequired ?? 100,
@@ -66,7 +66,7 @@ export function useRetrainCalibrationModel() {
 export function useMyCohortBenchmark(userId: string | null) {
   return useQuery<BenchmarkReport>({
     queryKey: ["calibration", "cohorts", "benchmark", userId],
-    queryFn: () => apiRequest<BenchmarkReport>("/cohorts/my-benchmark"),
+    queryFn: () => apiRequest<BenchmarkReport>("/api/v2/cohorts/my-benchmark"),
     enabled: !!userId,
     staleTime: STALE_TIME,
   });
@@ -78,7 +78,7 @@ export function useForceReclusterCohorts(userId: string | null) {
 
   return useMutation<{ job_id: string; status: string; message: string }, Error, void>({
     mutationFn: () =>
-      apiRequest<{ job_id: string; status: string; message: string }>("/cohorts/recluster", {
+      apiRequest<{ job_id: string; status: string; message: string }>("/api/v2/cohorts/recluster", {
         method: "POST",
       }),
     onSuccess: () => {
@@ -97,7 +97,7 @@ interface PromoteModelPayload {
 export function usePromoteModel() {
   return useMutation<ModelRegistrationInfo, Error, PromoteModelPayload>({
     mutationFn: (payload) =>
-      apiRequest<ModelRegistrationInfo>("/ml-platform/models/promote", {
+      apiRequest<ModelRegistrationInfo>("/api/v2/ml-platform/models/promote", {
         method: "POST",
         body: JSON.stringify({
           model_name: payload.modelName,
@@ -114,7 +114,7 @@ export function useCompareModels(candidateRunId: string | null, productionRunId:
     queryKey: ["calibration", "models", "compare", candidateRunId, productionRunId],
     queryFn: () =>
       apiRequest<any>(
-        `/ml-platform/models/compare?candidate_run_id=${candidateRunId}&production_run_id=${productionRunId}`
+        `/api/v2/ml-platform/models/compare?candidate_run_id=${candidateRunId}&production_run_id=${productionRunId}`
       ),
     enabled: !!candidateRunId && !!productionRunId,
   });
