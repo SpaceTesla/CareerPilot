@@ -298,4 +298,76 @@ export interface AutoFillTask {
   confirm_details?: AutoFillConfirmDetails;
 }
 
+// ── Wave 10 Future Scale Features (Strategy, digests, reviews) ────────────────
+
+export interface UserDigestBrief {
+  id: string;
+  sent_at: string | null;
+  health_score: {
+    score: number;
+    delta: number;
+    primary_insight?: string;
+  };
+  delivery_status: string;
+}
+
+export interface DigestJobBrief {
+  id: string;
+  title: string;
+  company_name: string;
+}
+
+export interface UserDigestDetail {
+  id: string;
+  sent_at: string | null;
+  content: {
+    health_score: {
+      score: number;
+      delta: number;
+      primary_insight: string;
+    };
+    market_insights: string;
+    position_delta: {
+      resolved_gaps: (string | { name: string; frequency?: number })[];
+      remaining_gaps: (string | { name: string; frequency?: number })[];
+    };
+    recommendations: DigestJobBrief[];
+  };
+  delivery_status: string;
+}
+
+export interface StrategyReviewBrief {
+  id: string;
+  created_at: string;
+  status: "PENDING_REVIEW" | "COMPLETED" | "SKIPPED";
+  health_score_start: number;
+  health_score_end: number;
+  completed_at: string | null;
+}
+
+export interface StrategyActionItem {
+  id: string;
+  description: string;
+  difficulty: "EASY" | "MODERATE" | "HARD";
+  status: "TODO" | "COMPLETED" | "CANCELLED";
+  target_date: string | null;
+}
+
+export interface StrategyReviewDetail {
+  id: string;
+  status: "PENDING_REVIEW" | "COMPLETED" | "SKIPPED";
+  goals: {
+    target_role: string;
+    timeline_months?: number;
+    [key: string]: unknown;
+  };
+  metrics: {
+    health_score_start: number;
+    current_health_score: number;
+  };
+  insights_summary: string;
+  action_items: StrategyActionItem[];
+}
+
+
 
