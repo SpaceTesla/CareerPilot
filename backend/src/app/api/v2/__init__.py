@@ -7,6 +7,7 @@ from app.api.v2.profile import router as profile_router
 from app.api.v2.market import router as market_router
 from app.api.v2.intelligence import router as intelligence_router
 from app.api.v2.dashboard import router as dashboard_router
+from app.api.v2.agent import router as agent_router
 
 router = APIRouter(prefix="/api/v2")
 router.include_router(health_router)
@@ -16,5 +17,7 @@ router.include_router(profile_router)
 router.include_router(market_router)
 router.include_router(intelligence_router)
 router.include_router(dashboard_router)
+router.include_router(agent_router)
+
 
 

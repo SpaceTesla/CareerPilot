@@ -958,3 +958,163 @@ class DashboardAnalyticsEvent(Base):
         DateTime, default=now_utc, index=True, nullable=False
     )
 
+
+class AgentSession(Base):
+    __tablename__ = "agent_sessions"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    thread_id: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    current_status: Mapped[str] = mapped_column(String(50), default="active", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+
+class AgentCheckpoint(Base):
+    __tablename__ = "agent_checkpoints"
+
+    thread_id: Mapped[str] = mapped_column(
+        String(255), ForeignKey("agent_sessions.thread_id", ondelete="CASCADE"), primary_key=True
+    )
+    checkpoint_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    parent_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    checkpoint: Mapped[bytes] = mapped_column(nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class AgentRun(Base):
+    __tablename__ = "agent_runs"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    thread_id: Mapped[str] = mapped_column(
+        String(255), ForeignKey("agent_sessions.thread_id", ondelete="CASCADE"), nullable=False
+    )
+    trigger_source: Mapped[str] = mapped_column(String(100), nullable=False)
+    start_time: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    end_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    tokens_used: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    estimated_cost: Mapped[float] = mapped_column(Numeric(10, 6), default=0.0, nullable=False)
+    success: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class AgentDecisionLog(Base):
+    __tablename__ = "agent_decision_logs"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    thread_id: Mapped[str] = mapped_column(
+        String(255), ForeignKey("agent_sessions.thread_id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    run_id: Mapped[str] = mapped_column(UUID(as_uuid=False), index=True, nullable=False)
+    current_node: Mapped[str] = mapped_column(String(100), nullable=False)
+    routing_decision: Mapped[str] = mapped_column(String(100), nullable=False)
+    reasoning_explanation: Mapped[str] = mapped_column(Text, nullable=False)
+    state_snapshot_before: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    state_snapshot_after: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class ResearchMemory(Base):
+    __tablename__ = "research_memories"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    company_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    company_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    role_category: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    structured_data: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    raw_sources: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    confidence_score: Mapped[float] = mapped_column(Numeric(3, 2), default=1.00, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+
+class AgentIntelligenceReport(Base):
+    __tablename__ = "agent_intelligence_reports"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    thread_id: Mapped[str] = mapped_column(
+        String(255), ForeignKey("agent_sessions.thread_id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    overall_health_score: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    position_delta_score: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    fit_score: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    structured_explanation: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class InteractionSummary(Base):
+    __tablename__ = "interaction_summaries"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    thread_id: Mapped[str] = mapped_column(
+        String(255), ForeignKey("agent_sessions.thread_id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    summary_text: Mapped[str] = mapped_column(Text, nullable=False)
+    start_message_timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    end_message_timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class InteractionMemory(Base):
+    __tablename__ = "interaction_memories"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    thread_id: Mapped[str] = mapped_column(
+        String(255), ForeignKey("agent_sessions.thread_id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    role: Mapped[str] = mapped_column(String(50), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    summary_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("interaction_summaries.id", ondelete="SET NULL"), nullable=True
+    )
+    tokens_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class AgentApprovalRequest(Base):
+    __tablename__ = "agent_approval_requests"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    thread_id: Mapped[str] = mapped_column(
+        String(255), ForeignKey("agent_sessions.thread_id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    action_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="pending", index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+
+class AgentApprovalAuditLog(Base):
+    __tablename__ = "agent_approval_audit_logs"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    approval_request_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("agent_approval_requests.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    actor_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    action_taken: Mapped[str] = mapped_column(String(50), nullable=False)
+    changes_made: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
