@@ -52,6 +52,8 @@ class IdentityService:
             user_id=user_id,
             job_search_status="PASSIVE",
             weekly_digest_enabled=True,
+            digest_delivery_day=1,
+            digest_delivery_hour=9,
             email_notifications=True,
         )
         db.add(db_pref)
@@ -105,6 +107,8 @@ class IdentityService:
 
         pref.job_search_status = pref_in.job_search_status.value
         pref.weekly_digest_enabled = pref_in.weekly_digest_enabled
+        pref.digest_delivery_day = pref_in.digest_delivery_day
+        pref.digest_delivery_hour = pref_in.digest_delivery_hour
         pref.email_notifications = pref_in.email_notifications
         await db.flush()
         return pref

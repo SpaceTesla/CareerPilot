@@ -35,6 +35,9 @@ class CareerPilotState(BaseModel):
     next_node_override: Optional[str] = None
     approved_by_user: bool = False
     audit_trail: List[str] = Field(default_factory=list)
+    repair_counter: Dict[str, int] = Field(default_factory=dict)
+    last_evaluation_feedback: Optional[str] = None
+    evaluation_scores: Dict[str, float] = Field(default_factory=dict)
 
 
 class RoutingDecision(BaseModel):

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from decimal import Decimal
 from uuid import UUID, uuid4
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
@@ -168,3 +169,39 @@ async def sync_resume(
     )
     await DashboardAggregationService.invalidate_cache(current_user.id)
     return profile
+
+
+@router.patch("/preferences", response_model=dict)
+async def patch_preferences(
+    pref_in: dict,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+    db: AsyncSession = Depends(DatabaseService.get_session),  # noqa: B008
+):
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+
+    from app.infrastructure.database.models import UserPreferences
+    stmt = select(UserPreferences).where(UserPreferences.user_id == current_user.id)
+    res = await db.execute(stmt)
+    pref = res.scalar_one_or_none()
+    if not pref:
+        raise HTTPException(status_code=404, detail="Preferences not found")
+
+    if "weekly_digest_enabled" in pref_in:
+        pref.weekly_digest_enabled = bool(pref_in["weekly_digest_enabled"])
+    if "digest_delivery_day" in pref_in:
+        pref.digest_delivery_day = int(pref_in["digest_delivery_day"])
+    if "digest_delivery_hour" in pref_in:
+        pref.digest_delivery_hour = int(pref_in["digest_delivery_hour"])
+
+    await db.flush()
+
+    return {
+        "weekly_digest_enabled": pref.weekly_digest_enabled,
+        "digest_delivery_day": pref.digest_delivery_day,
+        "digest_delivery_hour": pref.digest_delivery_hour,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }

@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -26,6 +26,10 @@ from app.core.logging import get_logger, setup_logging
 from app.infrastructure.database.connection import engine
 from app.infrastructure.database.init_db import init_db
 from app.middleware.request_id import RequestIDMiddleware
+from app.services.observability_telemetry_service import ObservabilityTelemetryService
+from app.services.metrics_collection_service import MetricsCollectionService
+from app.middleware.metrics import MetricsMiddleware
+from app.middleware.rate_limit import RateLimitMiddleware
 
 # Configure logging
 setup_logging(level="INFO", include_file_handler=True, log_file="logs/app.log")
@@ -37,6 +41,11 @@ async def lifespan(app: FastAPI):
     logger = get_logger(__name__)
     logger.info(f"Starting {app.title} v{settings.app_version}")
     logger.info(f"Using model: {settings.model_name}")
+    
+    # Initialize OpenTelemetry
+    collector_url = os.getenv("OTEL_COLLECTOR_URL", "http://localhost:4318/v1/traces")
+    ObservabilityTelemetryService.initialize_telemetry("careerpilot-api", collector_url)
+    ObservabilityTelemetryService.instrument_app(app)
     # DB health check
     try:
         with engine.connect() as conn:
@@ -56,6 +65,11 @@ async def lifespan(app: FastAPI):
 
     # At shutdown
     logger.info(f"Shutting down {app.title} v{settings.app_version}")
+    try:
+        from app.services.neo4j_service import Neo4jService
+        await Neo4jService.close_driver()
+    except Exception as e:
+        logger.warning(f"Error closing Neo4j driver on shutdown: {e}")
 
 
 app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
@@ -84,6 +98,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 4. Metrics middleware
+app.add_middleware(MetricsMiddleware)
+
+# 5. Rate limit middleware
+app.add_middleware(RateLimitMiddleware)
+
+# Expose /metrics scrape endpoint
+@app.get("/metrics")
+def metrics_endpoint():
+    return Response(
+        content=MetricsCollectionService.get_serialized_metrics(),
+        media_type="text/plain; version=0.0.4"
+    )
 
 # Include v2 API Router
 app.include_router(api_v2_router)

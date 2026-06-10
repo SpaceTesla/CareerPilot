@@ -38,6 +38,16 @@ from app.services.ghost_posting_detector_service import (
 from app.services.opportunity_scoring_service import (
     OpportunityRankingService,
 )
+from app.core.logging import get_logger
+from app.core.config import settings
+from app.schemas.market_graph import CareerPathResponse, RelatedSkillsResponse, GraphSyncResponse
+from app.services.career_graph_analytics_service import CareerGraphAnalyticsService
+from app.services.graph_ingestion_pipeline import GraphIngestionPipeline
+from app.services.gap_aware_retrieval_engine import GapAwareRetrievalEngine
+from fastapi import BackgroundTasks, Query
+from uuid import uuid4, UUID
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/market", tags=["market"])
 
@@ -802,3 +812,188 @@ async def list_opportunities(
         }
         for item in ranked
     ]
+
+
+@router.get("/graph/path", response_model=CareerPathResponse)
+async def get_career_path(
+    start_role: str = Query(..., description="Starting job title"),
+    target_role: str = Query(..., description="Target job title"),
+    max_steps: int = Query(2, alias="max_steps", description="Max steps in path"),
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """
+    Finds the most frequent career transition paths from a candidate's current role to target role.
+    """
+    if settings.auth_required and not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    paths = await CareerGraphAnalyticsService.find_career_paths(
+        start_role=start_role, target_role=target_role, max_depth=max_steps
+    )
+    return CareerPathResponse(paths=paths)
+
+
+@router.get("/graph/skills/{skill_name}/related", response_model=RelatedSkillsResponse)
+async def get_related_skills(
+    skill_name: str,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """
+    Retrieves related skills based on co-occurrence in candidate profiles.
+    """
+    if settings.auth_required and not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    related = await CareerGraphAnalyticsService.get_related_skills(skill_name=skill_name)
+    return RelatedSkillsResponse(searched_skill=skill_name, related_skills=related)
+
+
+@router.post("/graph/sync", response_model=GraphSyncResponse, status_code=202)
+async def trigger_graph_sync(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """
+    Manually triggers synchronization of PostgreSQL data to Neo4j.
+    """
+    if settings.auth_required and not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    task_id = str(uuid4())
+
+    async def run_sync():
+        try:
+            await GraphIngestionPipeline.sync_all_data()
+        except Exception as e:
+            logger.error(f"Background graph sync task failed: {e}")
+
+    background_tasks.add_task(run_sync)
+
+    return GraphSyncResponse(
+        task_id=task_id,
+        status="RUNNING",
+        message="Graph synchronization pipeline triggered."
+    )
+
+
+@router.get("/retrieval/adjacent", response_model=dict)
+async def get_adjacent_opportunities(
+    limit: int = Query(10, description="Max results to return"),
+    max_gaps: int = Query(2, description="Max allowed missing skills"),
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """
+    Retrieves adjacent opportunities for the user where they have small skill gaps.
+    """
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    results = await GapAwareRetrievalEngine.retrieve_adjacent_opportunities(
+        user_id=UUID(current_user.id), limit=limit, max_gaps=max_gaps
+    )
+    return {
+        "user_id": current_user.id,
+        "results": results
+    }
+
+
+@router.get("/retrieval/gap-analysis", response_model=dict)
+async def get_gap_analysis(
+    job_posting_id: str = Query(..., description="Target job posting UUID"),
+    db: AsyncSession = Depends(DatabaseService.get_session),  # noqa: B008
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """
+    Provides a breakdown of missing skills and learning paths for a target job posting.
+    """
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+
+    # 1. Fetch job posting
+    job = await db.get(JobPosting, job_posting_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job posting not found.",
+        )
+
+    # We query the skills for the job posting using a join
+    from sqlalchemy.orm import selectinload
+    stmt = (
+        select(JobPosting)
+        .options(selectinload(JobPosting.skills))
+        .where(JobPosting.id == job_posting_id)
+    )
+    res = await db.execute(stmt)
+    job_with_skills = res.scalar_one_or_none()
+
+    job_skills = []
+    if job_with_skills:
+        for jps in job_with_skills.skills:
+            # Fetch the normalized skill name
+            stmt_ns = select(NormalizedSkill).where(NormalizedSkill.id == jps.skill_id)
+            res_ns = await db.execute(stmt_ns)
+            ns = res_ns.scalar_one_or_none()
+            if ns:
+                job_skills.append({
+                    "name": ns.name,
+                    "importance": "REQUIRED" if jps.confidence_score and jps.confidence_score > 0.8 else "PREFERRED"
+                })
+
+    # 2. Fetch user's skills
+    from app.infrastructure.database.models import CareerProfile, Skill
+    stmt_prof = select(CareerProfile).where(CareerProfile.user_id == current_user.id)
+    res_prof = await db.execute(stmt_prof)
+    profile = res_prof.scalar_one_or_none()
+
+    user_skills = []
+    if profile:
+        stmt_sk = select(Skill).where(Skill.profile_id == profile.id)
+        res_sk = await db.execute(stmt_sk)
+        user_skills = [s.skill_name for s in res_sk.scalars().all()]
+
+    # 3. Calculate missing skills and analyze difficulty
+    user_skills_set = {s.lower() for s in user_skills}
+    missing_skill_items = [s for s in job_skills if s["name"].lower() not in user_skills_set]
+
+    missing_names = [s["name"] for s in missing_skill_items]
+    gaps = await GapAwareRetrievalEngine.analyze_skill_gap(user_skills, missing_names)
+
+    # Generate learning path suggestions
+    missing_skills_info = []
+    total_hours = 0
+    for gap in gaps:
+        importance = next((s["importance"] for s in missing_skill_items if s["name"] == gap.skill_name), "REQUIRED")
+
+        # Determine suggestion based on difficulty
+        if gap.difficulty_estimate == "EASY":
+            suggestion = f"Spend ~10-15 hours completing a quickstart and building a basic proof-of-concept for {gap.skill_name}."
+        elif gap.difficulty_estimate == "MODERATE":
+            suggestion = f"Dedicate ~30 hours to take a structured tutorial and integrate {gap.skill_name} into a small project."
+        else:
+            suggestion = f"Allow ~70+ hours to deeply study {gap.skill_name}, build multiple production systems, and review documentation."
+
+        missing_skills_info.append({
+            "skill_name": gap.skill_name,
+            "importance": importance,
+            "learning_path_suggestion": suggestion
+        })
+        total_hours += gap.estimated_learning_hours
+
+    overall_level = "LOW"
+    if total_hours >= 60:
+        overall_level = "HIGH"
+    elif total_hours >= 25:
+        overall_level = "MODERATE"
+
+    return {
+        "job_posting_id": job_posting_id,
+        "overall_gap_level": overall_level,
+        "missing_skills": missing_skills_info,
+        "learning_time_estimate_hours": total_hours
+    }

@@ -14,6 +14,8 @@ from sqlalchemy import (
     Date,
     Integer,
     Index,
+    UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -291,6 +293,8 @@ class UserPreferences(Base):
     )
     job_search_status: Mapped[str] = mapped_column(String(50), nullable=False)  # ACTIVE, PASSIVE, CLOSED
     weekly_digest_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    digest_delivery_day: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    digest_delivery_hour: Mapped[int] = mapped_column(Integer, default=9, nullable=False)
     email_notifications: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -1256,4 +1260,223 @@ class ApplicationStatusHistory(Base):
     previous_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
     new_status: Mapped[str] = mapped_column(String(50), nullable=False)
     changed_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class EvalDataset(Base):
+    __tablename__ = "eval_datasets"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    component_name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    input_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    expected_output: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+
+class EvalRun(Base):
+    __tablename__ = "eval_runs"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    commit_sha: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    environment: Mapped[str] = mapped_column(String(50), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    passed_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    failed_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    average_latency_ms: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
+    overall_accuracy: Mapped[float] = mapped_column(Numeric(5, 4), default=0.0, nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="running", index=True, nullable=False)
+
+
+class EvalResult(Base):
+    __tablename__ = "eval_results"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    eval_run_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("eval_runs.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    dataset_item_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("eval_datasets.id", ondelete="CASCADE"), nullable=False
+    )
+    actual_output: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    score: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
+    is_passed: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    execution_time_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class CalibrationModel(Base):
+    __tablename__ = "calibration_models"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    model_name: Mapped[str] = mapped_column(String(150), default="fit_probability_calibrator", nullable=False)
+    mlflow_run_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    mlflow_model_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    brier_score: Mapped[float] = mapped_column(Numeric(6, 5), nullable=False)
+    roc_auc: Mapped[float] = mapped_column(Numeric(6, 5), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    deployed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+    __table_args__ = (
+        Index("idx_calibration_models_active", "is_active", postgresql_where=text("is_active = true")),
+    )
+
+
+class CalibratedPredictionLog(Base):
+    __tablename__ = "calibrated_predictions_log"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    job_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_postings.id", ondelete="CASCADE"), nullable=False
+    )
+    calibration_model_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("calibration_models.id", ondelete="SET NULL"), nullable=True
+    )
+    raw_fit_score: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    calibrated_probability: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
+    actual_outcome: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    realized_target: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_calibrated_predictions_user", "user_id"),
+    )
+
+
+class PeerCohort(Base):
+    __tablename__ = "peer_cohorts"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    cohort_name: Mapped[str] = mapped_column(String(150), unique=True, nullable=False)
+    cluster_centroid: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    metrics_cache: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    member_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+
+class CohortMembership(Base):
+    __tablename__ = "cohort_memberships"
+
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    peer_cohort_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("peer_cohorts.id", ondelete="CASCADE"), nullable=False
+    )
+    salary_percentile: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    skills_percentile: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    outcome_velocity_percentile: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    assigned_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+    __table_args__ = (
+        Index("idx_cohort_memberships_cohort", "peer_cohort_id"),
+    )
+
+
+class MLModelRegistry(Base):
+    __tablename__ = "ml_model_registry"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    model_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    mlflow_run_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    version_tag: Mapped[str] = mapped_column(String(50), nullable=False)
+    current_stage: Mapped[str] = mapped_column(String(50), nullable=False)  # Candidate, Staging, Production, Archived
+    accuracy_metrics: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    registered_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_model_registry_stage", "model_name", "current_stage"),
+        UniqueConstraint("model_name", "version_tag", name="uq_name_version"),
+    )
+
+
+class GapRetrievalLog(Base):
+    __tablename__ = "gap_retrieval_logs"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    query_vector_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    postgres_query_string: Mapped[str | None] = mapped_column(Text, nullable=True)
+    adjacent_results_count: Mapped[int] = mapped_column(nullable=False)
+    user_feedback_score: Mapped[int | None] = mapped_column(nullable=True)
+    pipeline_duration_ms: Mapped[int] = mapped_column(nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class UserDigest(Base):
+    __tablename__ = "user_digests"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    health_score_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    market_insight_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    position_delta_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    recommendations_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    delivery_status: Mapped[str] = mapped_column(String(50), default="GENERATED", nullable=False)
+    opened_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    clicked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class CareerStrategyReview(Base):
+    __tablename__ = "career_strategy_reviews"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(50), default="PENDING_REVIEW", nullable=False)
+    goals_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    health_score_start: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    health_score_end: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    insights_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    feedback_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    action_items: Mapped[list[StrategyActionItem]] = relationship(
+        "StrategyActionItem", back_populates="review", cascade="all, delete-orphan"
+    )
+
+
+class StrategyActionItem(Base):
+    __tablename__ = "strategy_action_items"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    review_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("career_strategy_reviews.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    description: Mapped[str] = mapped_column(String(255), nullable=False)
+    difficulty: Mapped[str] = mapped_column(String(50), nullable=False)  # EASY, MODERATE, HARD
+    status: Mapped[str] = mapped_column(String(50), default="TODO", nullable=False)  # TODO, COMPLETED, CANCELLED
+    target_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    review: Mapped[CareerStrategyReview] = relationship("CareerStrategyReview", back_populates="action_items")
 

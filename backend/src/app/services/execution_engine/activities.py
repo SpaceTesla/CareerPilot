@@ -161,3 +161,55 @@ async def record_successful_submission(input_data: Dict[str, Any]) -> None:
         application_id=application_id,
         new_status="applied",
     )
+
+
+@activity.defn
+async def generate_digest_activity(user_id: str) -> Dict[str, Any]:
+    """Compile and create a new weekly digest entry in database."""
+    logger.info(f"Generating weekly digest for user {user_id}")
+    from app.services.weekly_digest_service import DigestGenerationService
+    from app.infrastructure.database.models import UserDigest
+    from uuid import uuid4, UUID
+    
+    content = await DigestGenerationService.generate_digest(UUID(user_id))
+    digest_id = str(uuid4())
+    
+    async with AsyncSessionLocal() as session:
+        db_digest = UserDigest(
+            id=digest_id,
+            user_id=user_id,
+            sent_at=None,
+            health_score_snapshot=content.health_score,
+            market_insight_summary=content.market_insights,
+            position_delta_snapshot=content.position_delta,
+            recommendations_snapshot={"jobs": content.recommendations},
+            delivery_status="GENERATED",
+            created_at=datetime.utcnow(),
+        )
+        session.add(db_digest)
+        await session.commit()
+        
+    return {
+        "digest_id": digest_id,
+        "user_id": user_id
+    }
+
+
+@activity.defn
+async def send_digest_email_activity(digest_id: str) -> bool:
+    """Send formatted email for digest and update delivery status."""
+    logger.info(f"Sending weekly digest email for digest {digest_id}")
+    from app.services.weekly_digest_service import DigestDeliveryService
+    res = await DigestDeliveryService.send_digest_email(digest_id)
+    return res
+
+
+@activity.defn
+async def initiate_strategy_review_activity(user_id: str) -> str:
+    """Call StrategyReviewOrchestrator to initiate a new monthly review."""
+    logger.info(f"Initiating monthly strategy review for user {user_id}")
+    from app.services.strategy_review_service import StrategyReviewOrchestrator
+    from uuid import UUID
+    
+    review_id = await StrategyReviewOrchestrator.initiate_review(UUID(user_id))
+    return review_id

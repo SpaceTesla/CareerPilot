@@ -36,6 +36,12 @@ dependencies = [
     "langgraph-checkpoint-postgres>=3.0.5",
     "psycopg-binary>=3.3.4",
     "temporalio>=1.8.0",
+    "scikit-learn>=1.9.0",
+    "mlflow>=3.13.0",
+    "prometheus-client>=0.25.0",
+    "opentelemetry-instrumentation-fastapi>=0.63b1",
+    "opentelemetry-exporter-otlp>=1.42.1",
+    "neo4j>=6.2.0",
 ]
 
 [tool.ruff]
@@ -108,6 +114,7 @@ line-ending = "auto"
 
 [dependency-groups]
 dev = [
+    "locust>=2.44.1",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.8.0",

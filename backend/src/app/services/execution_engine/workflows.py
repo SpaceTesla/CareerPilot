@@ -196,3 +196,53 @@ class ApplicationExecutionWorkflow:
                 "status": "FAILED",
                 "error": str(e),
             }
+
+
+@workflow.defn
+class WeeklyDigestWorkflow:
+    """Temporal workflow that runs weekly, generates, and sends digests to users."""
+
+    @workflow.run
+    async def run(self, input_payload: Dict[str, Any]) -> Dict[str, Any]:
+        user_id = input_payload.get("user_id")
+
+        # Compile digest
+        digest_res = await workflow.execute_activity(
+            activities.generate_digest_activity,
+            user_id,
+            start_to_close_timeout=timedelta(seconds=60),
+        )
+
+        # Send digest email
+        send_res = await workflow.execute_activity(
+            activities.send_digest_email_activity,
+            digest_res["digest_id"],
+            start_to_close_timeout=timedelta(seconds=60),
+        )
+
+        return {
+            "status": "COMPLETED",
+            "digest_id": digest_res["digest_id"],
+            "sent_successfully": send_res
+        }
+
+
+@workflow.defn
+class MonthlyReviewWorkflow:
+    """Temporal workflow that triggers monthly strategy reviews for a user."""
+
+    @workflow.run
+    async def run(self, input_payload: Dict[str, Any]) -> Dict[str, Any]:
+        user_id = input_payload.get("user_id")
+
+        # Initiate review activity
+        review_id = await workflow.execute_activity(
+            activities.initiate_strategy_review_activity,
+            user_id,
+            start_to_close_timeout=timedelta(seconds=60),
+        )
+
+        return {
+            "status": "COMPLETED",
+            "review_id": review_id
+        }

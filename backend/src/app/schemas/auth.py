@@ -44,6 +44,8 @@ class JobSearchStatus(str, Enum):
 class UserPreferencesUpdate(BaseModel):
     job_search_status: JobSearchStatus
     weekly_digest_enabled: bool
+    digest_delivery_day: int = 1
+    digest_delivery_hour: int = 9
     email_notifications: bool
 
 
