@@ -369,5 +369,127 @@ export interface StrategyReviewDetail {
   action_items: StrategyActionItem[];
 }
 
+// ── Wave 6 Agent HITL Approvals ──────────────────────────────────────────────
+export interface AgentApprovalRequest {
+  id: string;
+  thread_id: string;
+  action_type: string;
+  payload: Record<string, any>;
+  status: "pending" | "approved" | "rejected" | "modified";
+  created_at: string;
+}
 
+export interface AgentDecisionLog {
+  id: string;
+  current_node: string;
+  routing_decision: string;
+  reasoning_explanation: string;
+  created_at: string;
+}
 
+// ── Wave 7 Workflow Execution ────────────────────────────────────────────────
+export interface WorkflowExecutionLog {
+  workflow_id: string;
+  run_id: string;
+  workflow_type: string;
+  status: string;
+  task_queue: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BrowserExecutionLog {
+  id: string;
+  application_id: string;
+  step_index: number;
+  action_type: string;
+  target_selector: string | null;
+  value_entered: string | null;
+  screenshot_path: string | null;
+  html_archive_path: string | null;
+  status: string;
+  error_details: string | null;
+  created_at: string;
+}
+
+export interface ApplicationExecutionLogs {
+  checkpoints: {
+    id: string;
+    current_state: string;
+    checkpoint_data: Record<string, any>;
+    saved_at: string;
+  }[];
+  form_logs: {
+    id: string;
+    step_number: number;
+    step_name: string;
+    request_payload: Record<string, any>;
+    response_status: number;
+    error_captured: string | null;
+    created_at: string;
+  }[];
+  browser_logs: BrowserExecutionLog[];
+}
+
+// ── Wave 8 Calibration & Evaluations ────────────────────────────────────────
+export interface EvaluationRunBrief {
+  id: string;
+  component_name: string;
+  environment: string;
+  status: string;
+  commit_sha: string | null;
+  started_at: string;
+}
+
+export interface AgentEvaluationResult {
+  is_hallucinating: boolean;
+  faithfulness_score: number;
+  unattributed_statements: string[];
+  reasoning: string;
+}
+
+export interface MetricDefinition {
+  name: string;
+  value: number;
+  status: "pass" | "fail" | "warn";
+  description?: string;
+}
+
+export interface EvaluationReport {
+  run_id: string;
+  component_name: string;
+  environment: string;
+  status: string;
+  commit_sha: string | null;
+  metrics: MetricDefinition[];
+  results: Record<string, any>;
+  created_at: string;
+}
+
+export interface BenchmarkReport {
+  user_id: string;
+  cohort_id: string;
+  peer_count: number;
+  percentiles: {
+    skill_alignment: number;
+    positioning: number;
+    compensation: number;
+    overall: number;
+  };
+  averages: {
+    skill_alignment: number;
+    positioning: number;
+    compensation: number;
+    overall: number;
+  };
+  recommendations: string[];
+}
+
+export interface ModelRegistrationInfo {
+  model_name: string;
+  version_tag: string;
+  run_id: string;
+  stage: string;
+  registered_at: string;
+  metrics: Record<string, number>;
+}

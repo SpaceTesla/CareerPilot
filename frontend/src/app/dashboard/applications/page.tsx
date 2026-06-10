@@ -31,6 +31,8 @@ import {
   Loader2,
   Shield,
   Info,
+  Camera,
+  Activity,
 } from "lucide-react";
 import {
   useApplications,
@@ -40,6 +42,7 @@ import {
   useImportSession,
   useDeleteSession,
 } from "@/hooks/queries/useApplications";
+import { useApplicationExecutionLogs } from "@/hooks/queries/useAgent";
 import { ApplicationStatus, JobApplication } from "@/types/analysis";
 import { cn } from "@/lib/utils";
 
@@ -311,6 +314,7 @@ function ApplicationDialog({
   const [notes, setNotes] = useState(app?.notes ?? "");
   const updateApp = useUpdateApplication();
   const deleteApp = useDeleteApplication();
+  const { data: logs, isLoading: loadingLogs } = useApplicationExecutionLogs(app?.id || null);
 
   useEffect(() => {
     setNotes(app?.notes ?? "");
@@ -388,6 +392,99 @@ function ApplicationDialog({
             <Button size="sm" onClick={handleSaveNotes} disabled={updateApp.isPending}>
               Save Notes
             </Button>
+          </div>
+
+          {/* Separator */}
+          <hr className="border-border my-2" />
+
+          {/* Workflow Execution Traces (Wave 7) */}
+          <div className="space-y-3">
+            <p className="text-sm font-semibold flex items-center gap-1.5">
+              <Activity className="h-4 w-4 text-primary" />
+              Workflow Traces & Logs
+            </p>
+            {loadingLogs ? (
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : !logs || (!logs.checkpoints?.length && !logs.form_logs?.length && !logs.browser_logs?.length) ? (
+              <p className="text-xs text-muted-foreground italic">
+                No active automation traces or logs recorded for this application.
+              </p>
+            ) : (
+              <div className="space-y-3 max-h-60 overflow-y-auto pr-1 border rounded-lg p-3 bg-muted/30">
+                {/* Active runner status / checkpoints */}
+                {logs.checkpoints && logs.checkpoints.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Checkpoints</p>
+                    <div className="space-y-1 text-xs font-mono">
+                      {logs.checkpoints.map((cp) => (
+                        <div key={cp.id} className="flex justify-between border-b border-border/40 pb-1">
+                          <span className="text-primary">{cp.current_state}</span>
+                          <span className="text-muted-foreground">{new Date(cp.saved_at).toLocaleTimeString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Form fields filled */}
+                {logs.form_logs && logs.form_logs.length > 0 && (
+                  <div className="space-y-1.5 pt-2 border-t">
+                    <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Form Filler Logs</p>
+                    <div className="space-y-1 text-xs">
+                      {logs.form_logs.map((fl) => (
+                        <div key={fl.id} className="space-y-0.5 border-b border-border/40 pb-1">
+                          <div className="flex justify-between font-medium">
+                            <span>Step {fl.step_number}: {fl.step_name}</span>
+                            <Badge variant={fl.response_status === 200 ? "default" : "destructive"} className="text-[9px] px-1 py-0 h-4">
+                              {fl.response_status}
+                            </Badge>
+                          </div>
+                          {fl.error_captured && (
+                            <p className="text-[10px] text-red-500 italic">{fl.error_captured}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Playwright Browser Fallback Steps & Screenshots */}
+                {logs.browser_logs && logs.browser_logs.length > 0 && (
+                  <div className="space-y-1.5 pt-2 border-t">
+                    <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Browser Fallback Steps</p>
+                    <div className="space-y-2 text-xs">
+                      {logs.browser_logs.map((bl) => (
+                        <div key={bl.id} className="space-y-1 border-b border-border/40 pb-2">
+                          <div className="flex justify-between font-semibold font-mono">
+                            <span>Step {bl.step_index}: {bl.action_type}</span>
+                            <Badge variant={bl.status === "success" ? "default" : "destructive"} className="text-[9px] px-1 py-0 h-4 capitalize">
+                              {bl.status}
+                            </Badge>
+                          </div>
+                          {bl.target_selector && (
+                            <div className="text-[10px] text-muted-foreground truncate">Selector: <code>{bl.target_selector}</code></div>
+                          )}
+                          {bl.value_entered && (
+                            <div className="text-[10px] text-muted-foreground truncate">Value: <code>{bl.value_entered}</code></div>
+                          )}
+                          {bl.screenshot_path && (
+                            <div className="pt-1 flex items-center gap-1.5">
+                              <Camera className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-[10px] text-primary underline cursor-pointer hover:text-primary/80" onClick={() => alert(`Showing screenshot placeholder for path: ${bl.screenshot_path}`)}>
+                                View Screen Capture
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Job link */}

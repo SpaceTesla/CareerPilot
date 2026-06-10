@@ -12,6 +12,8 @@ import {
   HelpCircle,
   ArrowUpCircle,
   ClipboardList,
+  ShieldCheck,
+  Sliders,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -62,6 +64,16 @@ const navMain = [
     title: "Career",
     url: "/dashboard/career",
     icon: TrendingUp,
+  },
+  {
+    title: "Agent Approvals",
+    url: "/dashboard/approvals",
+    icon: ShieldCheck,
+  },
+  {
+    title: "Calibration",
+    url: "/dashboard/calibration",
+    icon: Sliders,
   },
   {
     title: "Interview",
