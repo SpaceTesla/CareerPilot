@@ -113,7 +113,7 @@ const navSecondary = [
   },
   {
     title: "Get Help",
-    url: "/help",
+    url: "/dashboard/help",
     icon: HelpCircle,
   },
 ];
