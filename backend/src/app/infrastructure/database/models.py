@@ -206,6 +206,16 @@ class JobApplication(Base):
     status: Mapped[str] = mapped_column(String(32), default="applied", index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     job_data_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    opportunity_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_postings.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    resume_version_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("profile_versions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    cover_letter_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    custom_answers: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    workflow_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     applied_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=now_utc, onupdate=now_utc
@@ -1117,4 +1127,133 @@ class AgentApprovalAuditLog(Base):
     action_taken: Mapped[str] = mapped_column(String(50), nullable=False)
     changes_made: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class WorkflowExecutionLog(Base):
+    __tablename__ = "workflow_execution_logs"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    workflow_id: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    run_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    workflow_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
+    task_queue: Mapped[str] = mapped_column(String(100), nullable=False)
+    input_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    output_payload: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    error_details: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+
+class ApplicationWorkflowCheckpoint(Base):
+    __tablename__ = "application_workflow_checkpoints"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    application_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_applications.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    current_state: Mapped[str] = mapped_column(String(50), nullable=False)
+    checkpoint_data: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    saved_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class ATSAuditLog(Base):
+    __tablename__ = "ats_audit_logs"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    application_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_applications.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    ats_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    request_url: Mapped[str] = mapped_column(Text, nullable=False)
+    request_headers: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    request_body: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    response_status: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    response_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class FormSchema(Base):
+    __tablename__ = "form_schemas"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    platform_provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    company_domain: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    fields_schema: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+
+class FormExecutionLog(Base):
+    __tablename__ = "form_execution_logs"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    application_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_applications.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    step_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    step_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    request_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    response_status: Mapped[int] = mapped_column(Integer, nullable=False)
+    error_captured: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class BrowserExecutionLog(Base):
+    __tablename__ = "browser_execution_logs"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    application_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_applications.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    step_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    action_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    target_selector: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    value_entered: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    screenshot_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    html_archive_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False)
+    error_details: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class ApplicationOutcome(Base):
+    __tablename__ = "application_outcomes"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    application_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_applications.id", ondelete="CASCADE"), unique=True, index=True, nullable=False
+    )
+    predicted_fit_score: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    final_outcome: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rejection_stage: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    prediction_error: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    days_to_response: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    follow_up_date: Mapped[datetime] = mapped_column(DateTime, index=True, nullable=False)
+    follow_up_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+
+class ApplicationStatusHistory(Base):
+    __tablename__ = "application_status_history"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    application_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("job_applications.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    previous_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    new_status: Mapped[str] = mapped_column(String(50), nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
 
