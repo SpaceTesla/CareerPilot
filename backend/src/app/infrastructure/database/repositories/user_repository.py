@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.infrastructure.database.models import User
+from app.services.auth_service import AuthService
 
 
 class UserRepository:
@@ -20,7 +21,14 @@ class UserRepository:
         user = self.get_by_email(email)
         if user:
             return user
-        user = User(id=str(uuid.uuid4()), email=email)
+        random_password = str(uuid.uuid4())
+        hashed_pwd = AuthService.hash_password(random_password)
+        user = User(
+            id=str(uuid.uuid4()),
+            email=email,
+            password_hash=hashed_pwd,
+        )
         self.session.add(user)
         self.session.flush()
         return user
+

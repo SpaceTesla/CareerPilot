@@ -34,6 +34,7 @@ from ...infrastructure.database.repositories.session_repository import (
 )
 from ...infrastructure.database.repositories.user_repository import UserRepository
 from ...services.resume_processing.resume_service import ResumeService
+from ...services.auth_service import AuthService
 
 router = APIRouter(prefix="/resume", tags=["resume"])
 
@@ -222,7 +223,13 @@ def _persist_resume_json(
                 if not existing_email_user or existing_email_user.id == preferred_user_id
                 else f"user-{preferred_user_id}@local.invalid"
             )
-            user = User(id=preferred_user_id, email=final_email)
+            random_password = str(uuid.uuid4())
+            hashed_pwd = AuthService.hash_password(random_password)
+            user = User(
+                id=preferred_user_id,
+                email=final_email,
+                password_hash=hashed_pwd,
+            )
             session.add(user)
             session.flush()
     else:
