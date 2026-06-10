@@ -14,7 +14,7 @@ Architecture Document > Doctrine > Feature Specification > Task Description
 
 ## Commit message guidance
 
-Use Conventional Commit style for all commits touching the repository. Each commit should have a compact header and a short, 1-2 line summary (the "Short"), followed by an optional multi-line description that explains why the change was made and any migration or follow-up steps.
+Use Conventional Commit style for all commits touching the repository. Each commit should have a compact header followed by a list of technical change items or bullet points summarizing the work.
 
 Header format (required):
 
@@ -22,62 +22,43 @@ Header format (required):
 
 Where `type` is one of `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `chore`, `ci`, `build`, etc. `scope` is a short module or area (optional but recommended).
 
-Body format (recommended):
+Body format (required):
 
-- Short: One-line summary expanding the header (1-2 lines).
-- Description: Longer explanation (3-6 lines) with reasoning, migration notes, and testing guidance.
+- A bulleted list using `-` for each distinct code modification, schema change, added service/method, bug fix, configuration update, or new integration test.
+- Keep bullets concise, technical, and direct, explaining what was changed and where.
 
 Checklist for commit bodies:
 
-- Explain the why, not just the what.
-- Note any breaking changes or required migrations.
-- Mention related tickets/PRs if applicable.
-- Include test notes: what to run and what to expect.
+- List all database model, schema, and migration changes.
+- Detail new services, interfaces, logic components, and helper integrations.
+- Enumerate updated/added API route controllers and endpoint changes.
+- Outline newly introduced tests or changes to test isolation setup.
 
 Examples
-
-Documentation change:
-
-```text
-docs(implementation): clarify doctrine ordering and intent
-
-Short: Clarify precedence: Architecture > Doctrine > Spec.
-
-Description:
-Make the precedence explicit so contributors know which document governs conflict resolution. Add examples and a short rationale: architecture documents describe system shape and may supersede doctrine for urgent architecture-level fixes.
-```
 
 Feature change:
 
 ```text
-feat(agent): require structured outputs and observability
-
-Short: Enforce typed outputs and observability for agents.
-
-Description:
-Require all agents to produce typed, structured outputs and emit observability events to enable evaluation and tracing. Add unit tests for output schema and update agent bootstrap to register metrics. Migration: update existing agents to implement `to_struct()` by YYYY-MM-DD.
+feat(market): fix market ingestion serialization, regex parsing, and test isolation
+- Use Pydantic's model_dump(mode="json") to convert Decimal and date fields to JSON-serializable primitives for raw ingestion payloads
+- Add support for 'a year', 'a yr', 'a month', 'an hour' formats in salary extraction regex
+- Clear database tables (job postings, duplicates, compensation, runs) before running integration tests to ensure test isolation
+- Configure Ruff to ignore B008 and ARG001 in pyproject.toml to match FastAPI endpoint conventions
+- Fix misc style violations: wrap long lines under 88 characters, use .is_(None) for SQL checks, and utilize implicit truth testing
 ```
 
-Refactor (code/structure) example:
+Feature / Wave implementation example:
 
 ```text
-refactor(api): reorganize route modules for readability
-
-Short: Move routes into feature-scoped modules and simplify imports.
-
-Description:
-Split the large `api.v1` router into smaller feature modules (identity, resume, analysis). Update import paths and tests. This is a non-functional change; CI should pass without data migrations. Follow-up: update docs and adjust any tooling that depends on old import paths.
-```
-
-Bugfix example:
-
-```text
-fix(db): ensure transaction rollback on repository errors
-
-Short: Rollback DB session on repository exceptions.
-
-Description:
-Previously some repository exceptions left sessions open and caused inconsistent states. Wrap repository operations with session context manager and add an integration test to assert rollback behavior on error.
+feat(intelligence): implement Wave 5 intelligence synthesis and career dashboard
+- Define new database models for health scores, targets, deltas, snapshots, ghost postings, opportunity scores, and dashboard analytics
+- Generate Alembic migration 90c09ec38235 to create target specification, score, and signal tables
+- Implement CareerHealthService to compute composite health scores across five weighted metrics
+- Implement PositionDeltaService to detect missing target skills, identify top-3 gaps, and generate recommendations
+- Implement services for GhostPostingDetectorService, OpportunityScoringService, and CompanyIntelligenceService
+- Create DashboardAggregationService to gather dashboard widget payloads concurrently with Redis-backed caching and eviction
+- Define FastAPI routes for /api/v2/intelligence and /api/v2/dashboard registered under versioned routers
+- Add full end-to-end integration tests in test_intelligence_dashboard.py covering the dashboard widget and analytics lifecycle
 ```
 
 PR title guidance
@@ -301,6 +282,12 @@ Preferred Stack:
 - Docker
 
 Technology substitutions require justification.
+
+---
+
+## Formatting & Documentation Requirements
+
+- Whenever referring to a filename in documentation, pull request descriptions, code comments, or commit messages, surround the filename with backticks (e.g., `IMPLEMENTATION_DOCTRINE.md`).
 
 ---
 
