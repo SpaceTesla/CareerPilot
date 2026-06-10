@@ -3,7 +3,18 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Numeric, String, Text, Date
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    Text,
+    Date,
+    Integer,
+    Index,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -462,6 +473,21 @@ class Company(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=now_utc, onupdate=now_utc, nullable=False
     )
+    hiring_velocity_30d: Mapped[float] = mapped_column(
+        Numeric(6, 2), default=0.0, nullable=False
+    )
+    hiring_velocity_90d: Mapped[float] = mapped_column(
+        Numeric(6, 2), default=0.0, nullable=False
+    )
+    trend_direction: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )
+    attractiveness_score: Mapped[float] = mapped_column(
+        Numeric(5, 2), default=0.0, nullable=False
+    )
+    last_aggregated_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
 
     postings: Mapped[list[JobPosting]] = relationship("JobPosting", back_populates="company")
 
@@ -494,6 +520,12 @@ class JobPosting(Base):
     )
     dedupe_fingerprint: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_ghost_posting: Mapped[bool] = mapped_column(
+        Boolean, default=False, index=True, nullable=False
+    )
+    ghost_score: Mapped[float] = mapped_column(
+        Numeric(5, 2), default=0.0, nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=now_utc, onupdate=now_utc, nullable=False
@@ -695,4 +727,234 @@ class CompensationBenchmark(Base):
     p75_salary: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     sample_size: Mapped[int] = mapped_column(nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, nullable=False)
+
+
+class CareerHealthScore(Base):
+    __tablename__ = "career_health_scores"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    score: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    skill_alignment_score: Mapped[float] = mapped_column(
+        Numeric(5, 2), nullable=False
+    )
+    market_positioning_score: Mapped[float] = mapped_column(
+        Numeric(5, 2), nullable=False
+    )
+    activity_health_score: Mapped[float] = mapped_column(
+        Numeric(5, 2), nullable=False
+    )
+    compensation_alignment_score: Mapped[float] = mapped_column(
+        Numeric(5, 2), nullable=False
+    )
+    profile_completeness_score: Mapped[float] = mapped_column(
+        Numeric(5, 2), nullable=False
+    )
+    primary_insight: Mapped[str] = mapped_column(Text, nullable=False)
+    top_driver: Mapped[str] = mapped_column(String(255), nullable=False)
+    top_detractor: Mapped[str] = mapped_column(String(255), nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, index=True, nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_health_scores_user_computed", "user_id", "computed_at"),
+    )
+
+
+class TargetRoleSpecification(Base):
+    __tablename__ = "target_role_specifications"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    role_title: Mapped[str] = mapped_column(
+        String(255), unique=True, index=True, nullable=False
+    )
+    typical_experience_years: Mapped[float] = mapped_column(
+        Numeric(4, 1), nullable=False
+    )
+    typical_salary_p50: Mapped[float | None] = mapped_column(
+        Numeric(12, 2), nullable=True
+    )
+    typical_salary_p75: Mapped[float | None] = mapped_column(
+        Numeric(12, 2), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+
+class PositionDelta(Base):
+    __tablename__ = "position_deltas"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+    target_role: Mapped[str] = mapped_column(String(255), nullable=False)
+    missing_skills: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, default=list, nullable=False
+    )
+    top_3_prioritized_gaps: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, default=list, nullable=False
+    )
+    recommendation_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, index=True, nullable=False
+    )
+
+
+class CompanyWatchlist(Base):
+    __tablename__ = "company_watchlists"
+
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    company_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("companies.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    notifications_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, nullable=False
+    )
+
+
+class CompanySnapshot(Base):
+    __tablename__ = "company_snapshots"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    company_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("companies.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    active_postings_count: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )
+    hiring_velocity: Mapped[float] = mapped_column(
+        Numeric(6, 2), nullable=False
+    )
+    attractiveness_score: Mapped[float] = mapped_column(
+        Numeric(5, 2), nullable=False
+    )
+    snapshot_date: Mapped[date] = mapped_column(Date, index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, nullable=False
+    )
+
+
+class GhostPostingSignal(Base):
+    __tablename__ = "ghost_posting_signals"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    job_posting_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("job_postings.id", ondelete="CASCADE"),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+    ghost_score: Mapped[float] = mapped_column(
+        Numeric(5, 2), index=True, nullable=False
+    )
+    is_flagged_ghost: Mapped[bool] = mapped_column(
+        Boolean, default=False, index=True, nullable=False
+    )
+    age_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    repost_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    company_velocity_ratio: Mapped[float] = mapped_column(
+        Numeric(4, 2), nullable=False
+    )
+    cohort_applications: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )
+    cohort_interviews: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )
+    explanation: Mapped[str] = mapped_column(Text, nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, nullable=False
+    )
+
+
+class OpportunityScore(Base):
+    __tablename__ = "opportunity_scores"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    job_posting_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("job_postings.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    fit_score: Mapped[float] = mapped_column(
+        Numeric(5, 2), index=True, nullable=False
+    )
+    skill_fit_score: Mapped[float] = mapped_column(
+        Numeric(5, 2), nullable=False
+    )
+    experience_fit_score: Mapped[float] = mapped_column(
+        Numeric(5, 2), nullable=False
+    )
+    compensation_fit_score: Mapped[float] = mapped_column(
+        Numeric(5, 2), nullable=False
+    )
+    company_attractiveness_score: Mapped[float] = mapped_column(
+        Numeric(5, 2), nullable=False
+    )
+    explanation_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_user_job_opp_scores", "user_id", "job_posting_id", unique=True),
+    )
+
+
+class DashboardAnalyticsEvent(Base):
+    __tablename__ = "dashboard_analytics_events"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    widget_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        JSON, default=dict, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now_utc, index=True, nullable=False
+    )
 

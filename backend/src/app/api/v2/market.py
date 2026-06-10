@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import distinct, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +28,16 @@ from app.services.location_normalization_service import (
 )
 from app.services.skill_extraction_service import SkillExtractionService
 from app.services.skill_trend_service import SkillTrendService
+from app.services.company_intelligence_service import (
+    WatchlistService,
+    CompanyIntelligenceService,
+)
+from app.services.ghost_posting_detector_service import (
+    GhostPostingDetectorService,
+)
+from app.services.opportunity_scoring_service import (
+    OpportunityRankingService,
+)
 
 router = APIRouter(prefix="/market", tags=["market"])
 
@@ -612,3 +622,183 @@ async def get_compensation(
         },
         "skill_premiums": skill_premiums,
     }
+
+
+@router.post("/companies/{company_id}/watch", status_code=200)
+async def watch_company(
+    company_id: str,
+    db: AsyncSession = Depends(DatabaseService.get_session),  # noqa: B008
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Add a company to user's watchlist."""
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    # Check if company exists
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Company not found.",
+        )
+    await WatchlistService.add_to_watchlist(
+        db, current_user.id, company_id
+    )
+    return {"status": "success", "company_id": company_id}
+
+
+@router.delete("/companies/{company_id}/watch", status_code=200)
+async def unwatch_company(
+    company_id: str,
+    db: AsyncSession = Depends(DatabaseService.get_session),  # noqa: B008
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Remove a company from user's watchlist."""
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    success = await WatchlistService.remove_from_watchlist(
+        db, current_user.id, company_id
+    )
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Watchlist entry not found.",
+        )
+    return {"status": "success", "company_id": company_id}
+
+
+@router.get("/companies/watch", response_model=list)
+async def list_watched_companies(
+    db: AsyncSession = Depends(DatabaseService.get_session),  # noqa: B008
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """List companies on the user's watchlist."""
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    companies = await WatchlistService.get_watchlist(db, current_user.id)
+    return [
+        {
+            "id": c.id,
+            "name": c.name,
+            "website": c.website,
+            "sector": c.sector,
+            "hiring_velocity_30d": float(c.hiring_velocity_30d),
+            "hiring_velocity_90d": float(c.hiring_velocity_90d),
+            "trend_direction": c.trend_direction,
+            "attractiveness_score": float(c.attractiveness_score),
+        }
+        for c in companies
+    ]
+
+
+@router.post("/companies/{company_id}/calculate-attractiveness", status_code=200)
+async def calculate_attractiveness(
+    company_id: str,
+    db: AsyncSession = Depends(DatabaseService.get_session),  # noqa: B008
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Re-compute attractiveness score and velocities for a company."""
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    company = await CompanyIntelligenceService.aggregate_company_intelligence(
+        db, company_id
+    )
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Company not found.",
+        )
+    return {
+        "id": company.id,
+        "name": company.name,
+        "hiring_velocity_30d": float(company.hiring_velocity_30d),
+        "hiring_velocity_90d": float(company.hiring_velocity_90d),
+        "trend_direction": company.trend_direction,
+        "attractiveness_score": float(company.attractiveness_score),
+    }
+
+
+@router.post("/postings/{posting_id}/ghost-analyze", status_code=200)
+async def analyze_ghost_posting(
+    posting_id: str,
+    db: AsyncSession = Depends(DatabaseService.get_session),  # noqa: B008
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Run ghost analysis on a specific job posting."""
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    signal = await GhostPostingDetectorService.detect_ghost_posting(db, posting_id)
+    if not signal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job posting not found.",
+        )
+    return {
+        "job_posting_id": signal.job_posting_id,
+        "ghost_score": float(signal.ghost_score),
+        "is_flagged_ghost": signal.is_flagged_ghost,
+        "age_days": signal.age_days,
+        "repost_count": signal.repost_count,
+        "company_velocity_ratio": float(signal.company_velocity_ratio),
+        "cohort_applications": signal.cohort_applications,
+        "cohort_interviews": signal.cohort_interviews,
+        "explanation": signal.explanation,
+    }
+
+
+@router.get("/opportunities", status_code=200)
+async def list_opportunities(
+    limit: int = 10,
+    db: AsyncSession = Depends(DatabaseService.get_session),  # noqa: B008
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """List ranked fit-score opportunities for the current user."""
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    ranked = await OpportunityRankingService.rank_opportunities(
+        db, current_user.id, limit=limit
+    )
+    return [
+        {
+            "job_id": item["job"].id,
+            "title": item["job"].title,
+            "company_id": item["job"].company_id,
+            "location": item["job"].location,
+            "compensation_min": (
+                float(item["job"].compensation_min)
+                if item["job"].compensation_min is not None
+                else None
+            ),
+            "compensation_max": (
+                float(item["job"].compensation_max)
+                if item["job"].compensation_max is not None
+                else None
+            ),
+            "fit_score": float(item["score"].fit_score),
+            "skill_fit_score": float(item["score"].skill_fit_score),
+            "experience_fit_score": float(item["score"].experience_fit_score),
+            "compensation_fit_score": float(item["score"].compensation_fit_score),
+            "company_attractiveness_score": float(
+                item["score"].company_attractiveness_score
+            ),
+            "explanation": item["score"].explanation_json,
+        }
+        for item in ranked
+    ]

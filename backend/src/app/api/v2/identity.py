@@ -13,6 +13,7 @@ from app.schemas.auth import (
 )
 from app.services.database_service import DatabaseService
 from app.services.identity_service import IdentityService
+from app.services.dashboard_service import DashboardAggregationService
 
 router = APIRouter(prefix="/identity", tags=["identity"])
 
@@ -84,4 +85,5 @@ async def update_goals(
             detail="Authentication required",
         )
     goals = await IdentityService.update_goals(db, current_user.id, goals_in)
+    await DashboardAggregationService.invalidate_cache(current_user.id)
     return goals

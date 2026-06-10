@@ -22,6 +22,7 @@ from app.services.llm_parser_service import LLMParserService
 from app.services.profile_service import ProfileService
 from app.services.profile_sync_service import ProfileSyncService
 from app.services.resume_extractor_service import ResumeExtractorService
+from app.services.dashboard_service import DashboardAggregationService
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 
@@ -52,6 +53,7 @@ async def update_profile(
             detail="Authentication required",
         )
     profile = await ProfileService.update_profile(db, UUID(current_user.id), data)
+    await DashboardAggregationService.invalidate_cache(current_user.id)
     return profile
 
 
@@ -90,6 +92,7 @@ async def restore_version(
     profile = await ProfileService.restore_version(
         db, UUID(current_user.id), version_number
     )
+    await DashboardAggregationService.invalidate_cache(current_user.id)
     return profile
 
 
@@ -163,4 +166,5 @@ async def sync_resume(
         resume_id=request.resume_id,
         override_data=request.override_data,
     )
+    await DashboardAggregationService.invalidate_cache(current_user.id)
     return profile
